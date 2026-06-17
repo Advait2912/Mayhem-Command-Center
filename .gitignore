@@ -1,0 +1,30 @@
+# Dependency directories
+node_modules/
+backend/venv/
+venv/
+.venv/
+env/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.compile
+*.so
+
+# Environment variables and secrets
+.env
+.env.*
+*.secret
+
+# OS and IDE files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build outputs
+dist/
+build/
+outputs/
+/docs
