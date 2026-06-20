@@ -1,0 +1,45 @@
+.section-block {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.section-icon {
+  color: var(--accent-blue);
+  display: flex;
+}
+
+.section-action {
+  font-size: 0.85rem;
+}
+
+.section-content {
+  padding: 1.25rem;
+}
+
+.section-content.no-padding {
+  padding: 0;
+}

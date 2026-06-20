@@ -61,5 +61,6 @@ Thumbs.db
 # backend/models/*.pkl
 # backend/models/*.cbm
 # backend/models/*.json
+# remove documentation and migration documents
 docs/
 migration/

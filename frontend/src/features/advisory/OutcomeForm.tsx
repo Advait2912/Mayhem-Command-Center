@@ -1,0 +1,118 @@
+import React, { useState } from 'react';
+import { Advisory } from '../../services/types';
+import { useOutcomes } from '../../hooks/useOutcomes';
+import { SectionBlock } from '../../components/SectionBlock';
+
+interface OutcomeFormProps {
+  advisory: Advisory;
+  sourceEventId?: string | number;
+}
+
+export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventId }) => {
+  const { submitOutcome, isSubmitting } = useOutcomes();
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const [actualOfficers, setActualOfficers] = useState('');
+  const [actualDuration, setActualDuration] = useState('');
+  const [actualClosure, setActualClosure] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess(false);
+
+    try {
+      await submitOutcome({
+        source_event_id: sourceEventId,
+        event_cause: advisory.event_cause,
+        zone: advisory.zone,
+        predicted_officers: advisory.recommended_officers,
+        predicted_closure_probability: advisory.closure_probability,
+        predicted_cascade_risk_score: advisory.cascade_risk_score,
+        actual_officers_used: actualOfficers ? parseInt(actualOfficers) : undefined,
+        actual_duration_hrs: actualDuration ? parseFloat(actualDuration) : undefined,
+        actual_required_closure: actualClosure || undefined,
+        notes: notes || undefined,
+      });
+      setSuccess(true);
+      // reset form
+      setActualOfficers('');
+      setActualDuration('');
+      setActualClosure('');
+      setNotes('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to log outcome.');
+    }
+  };
+
+  return (
+    <SectionBlock title="Log Outcome" icon="📝">
+      {success && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--status-success-bg)', color: 'var(--status-success)', borderRadius: 'var(--radius-sm)' }}>
+          Outcome logged successfully.
+        </div>
+      )}
+      {error && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--status-danger-bg)', color: '#fca5a5', borderRadius: 'var(--radius-sm)' }}>
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Actual Officers Used</label>
+            <input 
+              type="number" 
+              value={actualOfficers} 
+              onChange={e => setActualOfficers(e.target.value)} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Actual Duration (hrs)</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={actualDuration} 
+              onChange={e => setActualDuration(e.target.value)} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Required Road Closure?</label>
+            <select 
+              value={actualClosure} 
+              onChange={e => setActualClosure(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+            >
+              <option value="">-- Select --</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+        </div>
+        
+        <div>
+          <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Notes</label>
+          <textarea 
+            value={notes} 
+            onChange={e => setNotes(e.target.value)} 
+            rows={3}
+            style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', resize: 'vertical' }}
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          style={{ alignSelf: 'flex-start', padding: '0.5rem 1.5rem', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, opacity: isSubmitting ? 0.7 : 1 }}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Log'}
+        </button>
+      </form>
+    </SectionBlock>
+  );
+};
