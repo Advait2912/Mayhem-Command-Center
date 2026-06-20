@@ -1,48 +1,62 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import List, Optional
-from fastapi.middleware.cors import CORSMiddleware
-from services.prediction import PredictionService
-from services.history import HistoryService
-from services.conflict import ConflictService
+"""
+main.py — FastAPI application entry point.
 
-app = FastAPI(title="GridLock Command Center API")
+Run with:
+    uvicorn backend.main:app --reload --port 8000
+
+Startup lifecycle (via lifespan):
+  1. load_artifacts() — blocks until all models + data are loaded (~10-25s)
+  2. set_context(ctx) — stores singleton for all request handlers
+  3. Server ready
+
+No business logic lives here. All routing is delegated to backend/api/*.py.
+"""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.api import events, meta, outcomes, predict
+from backend.core.config import CORS_ORIGINS
+from backend.core.context import set_context
+from backend.services.inference import load_artifacts
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan: load all artifacts once at startup."""
+    print("[GridLock] Loading artifacts — this takes ~10-25 seconds on first start...")
+    ctx = load_artifacts()
+    set_context(ctx)
+    print(f"[GridLock] Ready. {len(ctx.df_hist)} events loaded, "
+          f"{len(ctx.G_main.nodes)} road nodes available.")
+    yield
+    # Shutdown: nothing to clean up (all state is in-memory)
+    print("[GridLock] Shutting down.")
+
+
+app = FastAPI(
+    title="GridLock Command Center",
+    description="Event-driven traffic advisory system for Bengaluru — FastAPI backend.",
+    version="2.0.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class EventInput(BaseModel):
-    event_type: str
-    location: str
-    zone: str
-    time: str
-    description: str
+app.include_router(meta.router,     prefix="/api", tags=["Meta"])
+app.include_router(events.router,   prefix="/api", tags=["Events"])
+app.include_router(predict.router,  prefix="/api", tags=["Predict"])
+app.include_router(outcomes.router, prefix="/api", tags=["Outcomes"])
 
-# Initialize Services
-prediction_svc = PredictionService()
-history_svc = HistoryService()
-conflict_svc = ConflictService()
 
-@app.get("/")
-async def root():
-    return {"status": "online", "message": "GridLock Command Center API is active"}
-
-@app.post("/api/generate-report")
-async def generate_report(event: EventInput):
-    # Convert Pydantic model to dict for services
-    event_dict = event.dict()
-    
-    # Generate the operational intelligence report using the dynamic engine
-    return {
-        "triage": prediction_svc.generate_triage(event.event_type),
-        "duration": prediction_svc.generate_duration(event.event_type),
-        "spatial_impact": prediction_svc.generate_spatial(event_dict),
-        "resources": prediction_svc.generate_resources(event.event_type),
-        "similar_events": history_svc.get_similar_events(event.event_type),
-        "conflict_check": conflict_svc.check_conflicts(event_dict)
-    }
+@app.get("/", tags=["Health"])
+def root():
+    return {"status": "ok", "service": "GridLock Command Center API"}

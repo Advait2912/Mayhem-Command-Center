@@ -1,0 +1,4 @@
+
+logged_at,source_event_id,event_cause,zone,predicted_officers,predicted_closure_probability,predicted_cascade_risk_score,actual_officers_used,actual_duration_hrs,actual_required_closure,notes
+2026-06-20T10:40:57.309917+00:00,,vehicle_breakdown,West Zone 2,3.0,0.234,,,,,
+2026-06-20T10:45:29.056957+00:00,,vehicle_breakdown,West Zone 2,3.0,0.234,,,,,
