@@ -14,7 +14,7 @@ import {
   PredictRequest,
 } from './types';
 
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * Endpoint 1: GET /api/meta
@@ -36,7 +36,7 @@ export async function getEvents(params: {
   limit?: number;
   offset?: number;
 }): Promise<EventListResponse> {
-  const url = new URL(`${window.location.origin}${BASE_URL}/events`);
+  const url = new URL(`${BASE_URL}/events`, window.location.origin);
   if (params.search) url.searchParams.set('search', params.search);
   if (params.cause) url.searchParams.set('cause', params.cause);
   if (params.zone) url.searchParams.set('zone', params.zone);
