@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getOutcomes, postOutcome } from '../services/api';
 import { OutcomeListResponse, OutcomeCreateRequest } from '../services/types';
+import { sessionStore, SESSION_KEYS } from '../services/sessionStore';
 
 export function useOutcomes() {
-  const [data, setData] = useState<OutcomeListResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<OutcomeListResponse | null>(() => {
+    return sessionStore.get<OutcomeListResponse>(SESSION_KEYS.OUTCOMES_LOG);
+  });
+  const [loading, setLoading] = useState<boolean>(!sessionStore.get(SESSION_KEYS.OUTCOMES_LOG));
   const [error, setError] = useState<Error | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -13,6 +16,7 @@ export function useOutcomes() {
     try {
       const res = await getOutcomes();
       setData(res);
+      sessionStore.set(SESSION_KEYS.OUTCOMES_LOG, res);
       setError(null);
     } catch (err: any) {
       setError(err);

@@ -23,28 +23,26 @@ export const BarricadeSection: React.FC<BarricadeSectionProps> = ({
     : 1;
 
   return (
-    <div style={{ marginBottom: 'var(--space-4)' }}>
-      {/* Barricade node */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-        <div>
-          <div className="eyebrow" style={{ marginBottom: '2px' }}>Recommended barricade node</div>
-          <span className="metric metric-md" style={{ color: 'var(--status-warning)' }}>
-            {recommended_barricade_node}
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'var(--space-2)', fontFamily: 'var(--font-mono)' }}>
-            ({barricade_candidates_considered.length} upstream candidates evaluated)
-          </span>
-        </div>
+    <div style={{ marginBottom: 'var(--space-3)' }}>
+      {/* Barricade node — single compact row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+        <div className="eyebrow">Barricade node</div>
+        <span className="metric metric-sm" style={{ color: 'var(--status-warning)' }}>
+          {recommended_barricade_node}
+        </span>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+          ({barricade_candidates_considered.length} candidates)
+        </span>
       </div>
 
-      {/* Diversion routes as compare-row bars */}
+      {/* Diversion routes as compact compare-row bars */}
       {diversion_routes.length > 0 && (
         <div>
-          <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Diversion routes</div>
+          <div className="eyebrow" style={{ marginBottom: 'var(--space-2)' }}>Diversion routes</div>
           {diversion_routes.map((rt, i) => (
-            <div key={rt.rank} style={{ marginBottom: 'var(--space-4)' }}>
+            <div key={rt.rank} style={{ marginBottom: 'var(--space-3)' }}>
               {/* Route label */}
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: 'var(--space-1)', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: i === 0 ? 'var(--accent-blue)' : 'var(--accent-purple)', fontWeight: 600 }}>
                   #{rt.rank}
                 </span>
@@ -55,7 +53,7 @@ export const BarricadeSection: React.FC<BarricadeSectionProps> = ({
               </div>
               {/* Distance bar */}
               <div className="compare-row">
-                <span className="compare-label">Distance</span>
+                <span className="compare-label">Dist</span>
                 <div className="compare-track">
                   <div
                     className={`compare-fill${i > 0 ? ' alt' : ''}`}
@@ -68,7 +66,7 @@ export const BarricadeSection: React.FC<BarricadeSectionProps> = ({
               </div>
               {/* Time bar */}
               <div className="compare-row">
-                <span className="compare-label">Est. time</span>
+                <span className="compare-label">Time</span>
                 <div className="compare-track">
                   <div
                     className={`compare-fill${i > 0 ? ' alt' : ''}`}

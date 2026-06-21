@@ -4,20 +4,21 @@ import { Dashboard } from './pages/Dashboard';
 import { NewPredict } from './pages/NewPredict';
 import { LivePredict } from './pages/LivePredict';
 import { Outcomes } from './pages/Outcomes';
-import { About } from './pages/About';
+import { Landing } from './pages/Landing';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/new" element={<NewPredict />} />
-          <Route path="/live" element={<LivePredict />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/app" element={<MainLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="new" element={<NewPredict />} />
+          <Route path="live" element={<LivePredict />} />
           <Route path="outcomes" element={<Outcomes />} />
-          <Route path="about" element={<About />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/app" replace />} />
         </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

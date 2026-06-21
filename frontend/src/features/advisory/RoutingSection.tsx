@@ -1,6 +1,6 @@
 import React from 'react';
 import { RoutingResult } from '../../services/types';
-import { SectionBlock } from '../../components/SectionBlock';
+
 
 interface RoutingSectionProps {
   routing: RoutingResult | null;
@@ -9,35 +9,37 @@ interface RoutingSectionProps {
 export const RoutingSection: React.FC<RoutingSectionProps> = ({ routing }) => {
   if (!routing) return null;
 
-  return (
-    <SectionBlock title="BPR Delay Impact" icon="⏱️">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Baseline Time</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{routing.baseline_minutes.toFixed(1)} min</div>
+    <div style={{ marginBottom: '8px' }}>
+      <div className="eyebrow" style={{ color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span>⏱️</span> BPR Delay Impact
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: '8px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '4px' }}>
+          <div className="eyebrow" style={{ marginBottom: '2px', fontSize: '9px' }}>Baseline</div>
+          <div className="metric metric-sm" style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{routing.baseline_minutes.toFixed(1)}m</div>
         </div>
         {typeof routing.affected_minutes === 'number' && (
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Affected Time</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{routing.affected_minutes.toFixed(1)} min</div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '4px' }}>
+            <div className="eyebrow" style={{ marginBottom: '2px', fontSize: '9px' }}>Affected</div>
+            <div className="metric metric-sm" style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{routing.affected_minutes.toFixed(1)}m</div>
           </div>
         )}
         {typeof routing.delay_minutes === 'number' && (
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Added Delay</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--status-danger)' }}>
-              +{routing.delay_minutes.toFixed(1)} min
-            </div>
+          <div style={{ background: 'rgba(255, 255, 255,0.1)', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255,0.2)' }}>
+            <div className="eyebrow" style={{ marginBottom: '2px', fontSize: '9px', color: 'var(--status-danger)' }}>Added Delay</div>
+            <div className="metric metric-sm" style={{ color: 'var(--status-danger)', fontSize: '13px' }}>+{routing.delay_minutes.toFixed(1)}m</div>
           </div>
         )}
-        <div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Footprint Nodes</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{routing.footprint_size}</div>
+        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '4px' }}>
+          <div className="eyebrow" style={{ marginBottom: '2px', fontSize: '9px' }}>Footprint</div>
+          <div className="metric metric-sm" style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{routing.footprint_size} <span style={{ fontSize: '10px' }}>nodes</span></div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '4px' }}>
+          <div className="eyebrow" style={{ marginBottom: '2px', fontSize: '9px' }}>Alt Route</div>
+          <div className="metric metric-sm" style={{ color: routing.alt_route_exists ? 'var(--status-success)' : 'var(--status-danger)', fontSize: '13px' }}>
+            {routing.alt_route_exists ? 'Yes' : 'No'}
+          </div>
         </div>
       </div>
-      <div style={{ fontSize: '0.9rem' }}>
-        <strong>Alt Route Exists:</strong> {routing.alt_route_exists ? 'Yes' : 'No'}
-      </div>
-    </SectionBlock>
-  );
+    </div>
 };

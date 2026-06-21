@@ -26,16 +26,22 @@ export const RiskMeter: React.FC<RiskMeterProps> = ({ probability }) => {
   // Position of the marker (0-100%)
   const markerPosition = Math.min(100, Math.max(0, percentage));
   
+  const getClassificationColor = () => {
+    if (probability < 0.4) return 'var(--status-success)';
+    if (probability < 0.7) return 'var(--status-warning)';
+    return 'var(--status-danger)';
+  };
+  
   return (
-    <div className="risk-meter">
+    <div className="risk-meter panel-live">
       <div className="risk-meter-header">
-        <div className="eyebrow">RISK ASSESSMENT</div>
+        <div className="eyebrow gradient-text">Risk Assessment</div>
         <div className={`status-tag status-tag-${getClassificationClass()}`}>
           {getClassification()}
         </div>
       </div>
       
-      <div className="metric metric-lg">{percentage}%</div>
+      <div className="metric metric-lg" style={{ color: getClassificationColor() }}>{percentage}%</div>
       
       <div className="risk-meter-track">
         <div 

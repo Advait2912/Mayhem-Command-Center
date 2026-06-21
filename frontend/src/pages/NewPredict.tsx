@@ -1,27 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMeta } from '../hooks/useMeta';
 import { usePredict } from '../hooks/usePredict';
-import { PredictRequest } from '../services/types';
+import { PredictRequest, Advisory } from '../services/types';
 import { AdvisoryPanel } from '../features/advisory/AdvisoryPanel';
+import { EventMap } from '../features/advisory/EventMap';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorBox } from '../components/ErrorBox';
+import { sessionStore, SESSION_KEYS } from '../services/sessionStore';
+
+const DEFAULT_FORM: PredictRequest = {
+  event_cause: '',
+  zone_filled: '',
+  latitude: 12.9716,
+  longitude: 77.5946,
+  start_datetime: new Date().toISOString().slice(0, 16),
+  description: '',
+  veh_type: '',
+  corridor: '',
+};
 
 export const NewPredict: React.FC = () => {
   const { data: meta, loading: metaLoading } = useMeta();
-  const { execute, data: advData, loading: advLoading, error: advError, reset } = usePredict();
+  const { execute, loading: advLoading, error: advError, reset } = usePredict();
 
-  const [form, setForm] = useState<PredictRequest>({
-    event_cause: '',
-    zone_filled: '',
-    latitude: 12.9716,
-    longitude: 77.5946,
-    start_datetime: new Date().toISOString().slice(0, 16),
-    description: '',
-    veh_type: '',
-    corridor: '',
+  // ── Restore form from session ──────────────────────────────────
+  const [form, setForm] = useState<PredictRequest>(() => {
+    const saved = sessionStore.get<PredictRequest>(SESSION_KEYS.NEW_FORM);
+    return saved ?? DEFAULT_FORM;
   });
 
-  const [isStretch, setIsStretch] = useState(false);
+  const [isStretch, setIsStretch] = useState<boolean>(() => {
+    return sessionStore.get<boolean>(SESSION_KEYS.NEW_IS_STRETCH) ?? false;
+  });
+
+  // ── Restore generated advisory from session ────────────────────
+  const [advData, setAdvData] = useState<Advisory | null>(() => {
+    return sessionStore.get<Advisory>(SESSION_KEYS.NEW_ADVISORY);
+  });
+
+  const [advError2, setAdvError2] = useState<string | null>(null);
+
+  // ── Persist form changes ───────────────────────────────────────
+  useEffect(() => {
+    sessionStore.set(SESSION_KEYS.NEW_FORM, form);
+  }, [form]);
+
+  useEffect(() => {
+    sessionStore.set(SESSION_KEYS.NEW_IS_STRETCH, isStretch);
+  }, [isStretch]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -38,7 +64,7 @@ export const NewPredict: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.event_cause || !form.zone_filled) return;
-    
+
     const payload = { ...form };
     if (!payload.veh_type) payload.veh_type = 'MISSING';
     if (!payload.corridor) payload.corridor = 'MISSING';
@@ -46,18 +72,52 @@ export const NewPredict: React.FC = () => {
       delete payload.endlatitude;
       delete payload.endlongitude;
     }
-    
-    await execute(payload);
+
+    setAdvError2(null);
+    try {
+      const result = await execute(payload);
+      if (result) {
+        setAdvData(result);
+        sessionStore.set(SESSION_KEYS.NEW_ADVISORY, result);
+      }
+    } catch (err: any) {
+      setAdvError2(err?.message ?? 'Failed to generate advisory');
+    }
   };
+
+  const handleClear = () => {
+    const freshForm = { ...DEFAULT_FORM, start_datetime: new Date().toISOString().slice(0, 16) };
+    setForm(freshForm);
+    setIsStretch(false);
+    setAdvData(null);
+    setAdvError2(null);
+    sessionStore.remove(SESSION_KEYS.NEW_FORM);
+    sessionStore.remove(SESSION_KEYS.NEW_IS_STRETCH);
+    sessionStore.remove(SESSION_KEYS.NEW_ADVISORY);
+    reset();
+  };
+
+  const displayError = advError2 ?? (advError ? String(advError) : null);
 
   return (
     <div style={{ display: 'flex', gap: '2rem', height: '100%' }}>
       {/* Left Column: Form */}
       <div style={{ flex: '1', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <h2 style={{ marginBottom: '0.25rem', color: 'var(--text-primary)' }}>Describe a new event</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-          No event-feed integration here — fill in what a controller would know the moment a report comes in.
-        </p>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 800,
+            fontSize: '18px',
+            letterSpacing: '-0.02em',
+            color: 'var(--text-primary)',
+            marginBottom: '4px',
+          }}>
+            Describe a new event
+          </div>
+          <div className="eyebrow" style={{ color: 'var(--accent-cyan)' }}>
+            No event-feed integration here — fill in what a controller would know the moment a report comes in.
+          </div>
+        </div>
         <div className="glass-panel" style={{ padding: '1.5rem', overflowY: 'auto' }}>
           {metaLoading ? <LoadingSpinner message="Loading options..." /> : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -87,7 +147,7 @@ export const NewPredict: React.FC = () => {
                   </div>
                   <div>
                     <label className="eyebrow" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Description</label>
-                    <textarea name="description" value={form.description} onChange={handleChange} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Free text..."/>
+                    <textarea name="description" value={form.description} onChange={handleChange} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Free text..." />
                   </div>
                 </div>
               </div>
@@ -147,7 +207,7 @@ export const NewPredict: React.FC = () => {
               <div>
                 <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Timing</div>
                 <div>
-                  <label className="eyebrow" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Start date & time (IST) *</label>
+                  <label className="eyebrow" style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Start date &amp; time (IST) *</label>
                   <input type="datetime-local" name="start_datetime" value={form.start_datetime} onChange={handleChange} required style={inputStyle} />
                 </div>
               </div>
@@ -156,10 +216,7 @@ export const NewPredict: React.FC = () => {
                 <button type="submit" disabled={advLoading || !form.event_cause || !form.zone_filled} style={btnStyle(true)}>
                   {advLoading ? 'Predicting...' : 'Run Advisory'}
                 </button>
-                <button type="button" onClick={() => {
-                  setForm({ ...form, event_cause: '', zone_filled: '', description: '' });
-                  reset();
-                }} style={btnStyle(false)}>
+                <button type="button" onClick={handleClear} style={btnStyle(false)}>
                   Clear
                 </button>
               </div>
@@ -169,17 +226,20 @@ export const NewPredict: React.FC = () => {
       </div>
 
       {/* Right Column: Advisory Result */}
-      <div style={{ flex: '1.5', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: '2rem', overflowY: 'auto' }}>
-        {!advData && !advLoading && !advError ? (
+      <div style={{ flex: '1.5', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: '1rem', overflowY: 'auto' }}>
+        {!advData && !advLoading && !displayError ? (
           <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
             Submit the form to see an advisory here.
           </div>
         ) : advLoading ? (
           <LoadingSpinner message="Generating ML predictions..." fullPage />
-        ) : advError ? (
-          <ErrorBox error={advError} />
+        ) : displayError ? (
+          <ErrorBox error={displayError} />
         ) : advData ? (
-          <AdvisoryPanel advisory={advData} />
+          <>
+            <EventMap advisory={advData} />
+            <AdvisoryPanel advisory={advData} />
+          </>
         ) : null}
       </div>
     </div>
@@ -187,11 +247,11 @@ export const NewPredict: React.FC = () => {
 };
 
 const inputStyle = {
-  width: '100%', 
-  padding: '0.6rem', 
-  borderRadius: 'var(--radius-sm)', 
-  border: '1px solid var(--glass-border)', 
-  background: 'rgba(0,0,0,0.2)', 
+  width: '100%',
+  padding: '0.6rem',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--glass-border)',
+  background: 'rgba(0,0,0,0.2)',
   color: 'white',
   fontFamily: 'inherit'
 };
@@ -200,7 +260,7 @@ const btnStyle = (primary: boolean) => ({
   flex: 1,
   padding: '0.75rem',
   background: primary ? 'var(--accent-blue)' : 'rgba(255,255,255,0.1)',
-  color: 'white',
+  color: primary ? 'var(--bg)' : 'white',
   border: 'none',
   borderRadius: 'var(--radius-sm)',
   fontWeight: 600,

@@ -15,22 +15,47 @@ interface AdvisoryPanelProps {
   sourceEventId?: string | number;
 }
 
+/* Thin divider with gradient fade */
+const Div = () => (
+  <div style={{
+    height: '1px',
+    margin: '8px 0',
+    background: 'linear-gradient(90deg, rgba(255, 255, 255,0.35), rgba(201, 204, 209,0.2), transparent)',
+  }} />
+);
+
+/* Section eyebrow */
+const SectionLabel = ({ label, color }: { label: string; color?: string }) => (
+  <div className="eyebrow" style={{
+    marginBottom: '6px',
+    color: color ?? 'var(--accent-cyan)',
+    letterSpacing: '0.07em',
+  }}>
+    {label}
+  </div>
+);
+
 export const AdvisoryPanel: React.FC<AdvisoryPanelProps> = ({ advisory, sourceEventId }) => {
   return (
     <div className="advisory-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── HEADLINE: Risk Meter + event title ── */}
+      {/* ── HEADLINE ── */}
       <RiskMeter probability={advisory.closure_probability} />
 
-      <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
-        <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+      <div style={{ marginTop: '8px', marginBottom: '6px' }}>
+        <div style={{
+          fontSize: '13px',
+          fontWeight: 700,
+          fontFamily: 'var(--font-display)',
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.01em',
+        }}>
           {advisory.event_cause.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
         </div>
-        <div className="eyebrow" style={{ marginTop: '2px' }}>
+        <div className="eyebrow" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {advisory.zone}
           {advisory.priority && (
-            <span className={`status-tag ${advisory.priority.label === 'HIGH' ? 'status-tag-high' : 'status-tag-low'}`}
-              style={{ marginLeft: 'var(--space-2)' }}>
+            <span className={`status-tag ${advisory.priority.label === 'HIGH' ? 'status-tag-high' : 'status-tag-low'}`}>
               {advisory.priority.label} priority
             </span>
           )}
@@ -40,55 +65,63 @@ export const AdvisoryPanel: React.FC<AdvisoryPanelProps> = ({ advisory, sourceEv
       {/* Spatial Warning */}
       {advisory.spatial_warning && (
         <div style={{
-          padding: 'var(--space-3) var(--space-4)',
+          padding: '5px 8px',
           background: 'var(--status-warning-bg)',
-          borderLeft: '3px solid var(--status-warning)',
+          borderLeft: '2px solid var(--status-warning)',
           borderRadius: 'var(--radius-sm)',
           color: 'var(--status-warning)',
-          fontSize: '13px',
-          marginBottom: 'var(--space-4)'
+          fontSize: '11px',
+          marginBottom: '6px',
         }}>
           {advisory.spatial_warning}
         </div>
       )}
 
-      <hr className="divider" />
+      <Div />
 
       {/* ── PRIMARY METRICS ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Incident Metrics</div>
+      <SectionLabel label="Incident Metrics" />
       <StatGrid advisory={advisory} />
 
-      <hr className="divider" />
+      <Div />
 
       {/* ── RECOMMENDED RESPONSE ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Recommended Response</div>
-      <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
+      <SectionLabel label="Recommended Response" />
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
         {/* Officers */}
-        <div style={{ flex: 1, padding: 'var(--space-4)', background: 'rgba(84,104,255,0.07)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--accent-blue)' }}>
-              <circle cx="8" cy="5" r="3"/>
-              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
-            </svg>
-            <span className="eyebrow">Officers</span>
-          </div>
-          <div className="metric metric-lg">{advisory.recommended_officers}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>formula-based heuristic</div>
+        <div style={{
+          flex: 1,
+          padding: '6px 8px',
+          background: 'rgba(255, 255, 255,0.07)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(255, 255, 255,0.2)',
+          transition: 'box-shadow 0.2s ease',
+          cursor: 'default',
+        }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--glow-blue)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+        >
+          <div className="eyebrow" style={{ color: 'var(--accent-blue)', marginBottom: '2px' }}>Officers</div>
+          <div className="metric metric-sm" style={{ fontSize: '15px' }}>{advisory.recommended_officers}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>formula-based</div>
         </div>
         {/* Tow trucks */}
         {advisory.recommended_tow_trucks != null && (
-          <div style={{ flex: 1, padding: 'var(--space-4)', background: 'rgba(52,195,214,0.07)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--accent-purple)' }}>
-                <rect x="1" y="6" width="10" height="6" rx="1"/>
-                <path d="M11 9h2l2 2v1h-4V9z"/>
-                <circle cx="4" cy="13" r="1.5"/>
-                <circle cx="12" cy="13" r="1.5"/>
-              </svg>
-              <span className="eyebrow">Tow Trucks</span>
-            </div>
-            <div className="metric metric-lg">{advisory.recommended_tow_trucks}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>formula-based heuristic</div>
+          <div style={{
+            flex: 1,
+            padding: '6px 8px',
+            background: 'rgba(201, 204, 209,0.07)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(201, 204, 209,0.2)',
+            transition: 'box-shadow 0.2s ease',
+            cursor: 'default',
+          }}
+            onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--glow-cyan)')}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+          >
+            <div className="eyebrow" style={{ color: 'var(--accent-cyan)', marginBottom: '2px' }}>Tow Trucks</div>
+            <div className="metric metric-sm" style={{ fontSize: '15px' }}>{advisory.recommended_tow_trucks}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>formula-based</div>
           </div>
         )}
       </div>
@@ -96,24 +129,23 @@ export const AdvisoryPanel: React.FC<AdvisoryPanelProps> = ({ advisory, sourceEv
       {/* Signal timing */}
       {advisory.signal_timing_suggestion && (
         <div style={{
-          padding: 'var(--space-3) var(--space-4)',
-          background: 'rgba(84,104,255,0.06)',
+          padding: '5px 8px',
+          background: 'rgba(255, 255, 255,0.06)',
           borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--glass-border)',
-          fontSize: '13px',
+          border: '1px solid rgba(255, 255, 255,0.15)',
+          fontSize: '11px',
           color: 'var(--text-secondary)',
-          marginBottom: 'var(--space-3)'
+          marginBottom: '6px',
         }}>
-          <div className="eyebrow" style={{ marginBottom: 'var(--space-1)' }}>Signal timing</div>
-          {/* Bug fix 2.5: render suggestion alone; API string already contains the qualifier */}
+          <span className="eyebrow" style={{ color: 'var(--accent-cyan)', marginRight: '6px' }}>Signal timing:</span>
           {advisory.signal_timing_suggestion}
         </div>
       )}
 
-      <hr className="divider" />
+      <Div />
 
       {/* ── ROUTE INTELLIGENCE ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Route Intelligence</div>
+      <SectionLabel label="Route Intelligence" />
       <RoutingSection routing={advisory.routing ?? null} />
       <BarricadeSection
         recommended_barricade_node={advisory.recommended_barricade_node ?? null}
@@ -121,26 +153,26 @@ export const AdvisoryPanel: React.FC<AdvisoryPanelProps> = ({ advisory, sourceEv
         diversion_routes={advisory.diversion_routes}
       />
 
-      <hr className="divider" />
+      <Div />
 
       {/* ── NETWORK HEALTH ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>Network Health</div>
+      <SectionLabel label="Network Health" />
       <NetworkResilience network_resilience={advisory.network_resilience ?? null} />
 
-      <hr className="divider" />
+      <Div />
 
-      {/* ── SUPPORTING EVIDENCE (visually de-emphasized) ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)', color: 'var(--text-muted)' }}>Supporting Evidence</div>
-      <div style={{ opacity: 0.85 }}>
+      {/* ── SUPPORTING EVIDENCE ── */}
+      <SectionLabel label="Supporting Evidence" color="var(--text-muted)" />
+      <div style={{ opacity: 0.88 }}>
         <HikeContext hike={advisory.predicted_hike_context ?? null} historical_peak={advisory.historical_peak_window ?? null} />
         <ConflictsSection conflicts={advisory.conflicts ?? null} />
         <SimilarEvents events={advisory.similar_past_events} summary={advisory.similar_past_events_summary ?? null} />
       </div>
 
-      <hr className="divider" />
+      <Div />
 
       {/* ── OUTCOME FORM ── */}
-      <div className="eyebrow" style={{ marginBottom: 'var(--space-3)', color: 'var(--text-muted)' }}>Log Actual Outcome</div>
+      <SectionLabel label="Log Actual Outcome" color="var(--text-muted)" />
       <OutcomeForm advisory={advisory} sourceEventId={sourceEventId} />
     </div>
   );
