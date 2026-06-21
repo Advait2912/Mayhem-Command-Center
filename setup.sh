@@ -7,7 +7,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 echo "2. Installing Python dependencies..."
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 
 echo "3. Installing Node.js dependencies..."
 cd frontend
