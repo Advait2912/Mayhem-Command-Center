@@ -53,7 +53,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-main.html
+
 # Large ML/Data Artifacts (Optional: uncomment to ignore large models/data)
 # backend/data/*.parquet
 # backend/data/*.graphml

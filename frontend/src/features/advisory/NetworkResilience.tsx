@@ -11,16 +11,16 @@ export const NetworkResilience: React.FC<NetworkResilienceProps> = ({ network_re
   const { routes_compromised, routes_checked, warning, route_status } = network_resilience;
 
   return (
-    <div style={{ marginBottom: 'var(--space-4)' }}>
+    <div style={{ marginBottom: 'var(--space-3)' }}>
       {/* Headline metric */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
         <span
-          className="metric metric-md"
+          className="metric metric-sm"
           style={{ color: routes_compromised > 0 ? 'var(--status-danger)' : 'var(--status-success)' }}
         >
           {routes_compromised} / {routes_checked}
         </span>
-        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
           routes compromised
         </span>
       </div>
@@ -62,7 +62,7 @@ export const NetworkResilience: React.FC<NetworkResilienceProps> = ({ network_re
       {warning && (
         <div style={{
           marginTop: 'var(--space-3)',
-          padding: 'var(--space-3) var(--space-4)',
+          padding: 'var(--space-2) var(--space-3)',
           background: 'var(--status-warning-bg)',
           borderLeft: '3px solid var(--status-warning)',
           borderRadius: 'var(--radius-sm)',

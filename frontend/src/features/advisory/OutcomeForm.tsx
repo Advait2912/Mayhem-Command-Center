@@ -60,33 +60,33 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Actual Officers Used</label>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Actual Officers Used</label>
             <input 
               type="number" 
               value={actualOfficers} 
               onChange={e => setActualOfficers(e.target.value)} 
-              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+              style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Actual Duration (hrs)</label>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Actual Duration (hrs)</label>
             <input 
               type="number" 
               step="0.1" 
               value={actualDuration} 
               onChange={e => setActualDuration(e.target.value)} 
-              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+              style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Required Road Closure?</label>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Required Road Closure?</label>
             <select 
               value={actualClosure} 
               onChange={e => setActualClosure(e.target.value)}
-              style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+              style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
             >
               <option value="">-- Select --</option>
               <option value="true">Yes</option>
@@ -96,7 +96,7 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
         </div>
         
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Notes</label>
+          <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Notes</label>
           <textarea 
             value={notes} 
             onChange={e => setNotes(e.target.value)} 
@@ -108,7 +108,20 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
         <button 
           type="submit" 
           disabled={isSubmitting}
-          style={{ alignSelf: 'flex-start', padding: '0.5rem 1.5rem', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, opacity: isSubmitting ? 0.7 : 1 }}
+          style={{
+            alignSelf: 'flex-start',
+            padding: '6px 18px',
+            background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))',
+            color: '#06080a',
+            border: 'none',
+            borderRadius: '30px',
+            fontWeight: 700,
+            fontFamily: 'var(--font-display)',
+            fontSize: '12px',
+            opacity: isSubmitting ? 0.7 : 1,
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Log'}
         </button>

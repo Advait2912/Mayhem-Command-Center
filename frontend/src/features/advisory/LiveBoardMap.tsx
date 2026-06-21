@@ -1,7 +1,56 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { Advisory } from '../../services/types';
+
+// Pulse CSS injected once
+const PULSE_CSS = `
+.lbm-pulse-wrapper { background: transparent !important; border: none !important; }
+.lbm-pulse { position: relative; width: 20px; height: 20px; }
+.lbm-core {
+  position: absolute; inset: 0; margin: auto;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--lbm-color, #5468FF);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 0 10px var(--lbm-color, #5468FF);
+  z-index: 3;
+}
+.lbm-ring {
+  position: absolute; inset: 0; margin: auto;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--lbm-color, #5468FF);
+  animation: lbm-anim 2.4s ease-out infinite; opacity: 0;
+}
+.lbm-ring.d2 { animation-delay: 1.2s; }
+@keyframes lbm-anim {
+  0%   { transform: scale(0.5); opacity: 0.85; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+`;
+let lbmCSS = false;
+const injectLBMCSS = () => {
+  if (lbmCSS) return;
+  const s = document.createElement('style');
+  s.textContent = PULSE_CSS;
+  document.head.appendChild(s);
+  lbmCSS = true;
+};
+
+const createLBMIcon = (color: string) => {
+  injectLBMCSS();
+  return L.divIcon({
+    className: 'lbm-pulse-wrapper',
+    html: `<div class="lbm-pulse" style="--lbm-color:${color}">
+      <span class="lbm-ring"></span>
+      <span class="lbm-ring d2"></span>
+      <span class="lbm-core"></span>
+    </div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -12],
+  });
+};
+
 
 interface LiveEvent {
   id: string;
@@ -21,56 +70,135 @@ const BoundsUpdater: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
     const bounds: [number, number][] = events
       .filter(ev => ev.advisory.latitude != null && ev.advisory.longitude != null)
       .map(ev => [ev.advisory.latitude, ev.advisory.longitude]);
-    
     if (bounds.length > 0) {
-      map.fitBounds(bounds, { maxZoom: 15, padding: [40, 40] });
+      map.fitBounds(bounds, { maxZoom: 14, padding: [50, 50] });
     }
   }, [events, map]);
   return null;
 };
 
+const riskColor = (prob: number) =>
+  prob >= 0.7 ? '#E5484D' : prob >= 0.4 ? '#E0A526' : '#2BAE76';
+
+const riskTagClass = (prob: number) =>
+  prob >= 0.7 ? 'status-tag-high' : prob >= 0.4 ? 'status-tag-medium' : 'status-tag-low';
+
+const riskLabel = (prob: number) =>
+  prob >= 0.7 ? 'CRITICAL' : prob >= 0.4 ? 'ELEVATED' : 'MONITORING';
+
 export const LiveBoardMap: React.FC<LiveBoardMapProps> = ({ events, onMarkerClick }) => {
+  const highestRiskEvent = events.length > 0
+    ? [...events].sort((a, b) => b.advisory.closure_probability - a.advisory.closure_probability)[0]
+    : null;
+
+  const totalActive = events.length;
+  const criticalCount = events.filter(e => e.advisory.closure_probability >= 0.7).length;
+
   return (
-    <div className="panel-live" style={{ height: '400px', width: '100%', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: '1rem', border: '1px solid var(--glass-border)' }}>
-      <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+    <div
+      className="panel-live"
+      style={{
+        height: '340px',
+        width: '100%',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        marginBottom: '0.75rem',
+        border: '1px solid rgba(84,104,255,0.2)',
+        position: 'relative',
+        boxShadow: criticalCount > 0 ? '0 0 20px rgba(229,72,77,0.15)' : '0 0 12px rgba(84,104,255,0.1)',
+      }}
+    >
+      <MapContainer
+        center={[12.9716, 77.5946]}
+        zoom={12}
+        style={{ height: '100%', width: '100%', zIndex: 1 }}
+        zoomControl={false}
+        attributionControl={false}
+      >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
         />
         <BoundsUpdater events={events} />
+
         {events.map((ev) => {
           const a = ev.advisory;
           if (a.latitude == null || a.longitude == null) return null;
-
-          const color = a.closure_probability >= 0.6 ? '#d9374a' : a.closure_probability >= 0.3 ? '#c98a12' : '#1aa260';
+          const color = riskColor(a.closure_probability);
+          const baseRadius = Math.min((a.footprint_radius_km ?? 0.5) * 1000, 700);
 
           return (
             <React.Fragment key={ev.id}>
-              <CircleMarker
-                center={[a.latitude, a.longitude]}
-                radius={9}
-                pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 2 }}
+              <Marker
+                position={[a.latitude, a.longitude]}
+                icon={createLBMIcon(color)}
                 eventHandlers={{ click: () => onMarkerClick(ev.id) }}
               >
                 <Popup>
                   <strong>{a.event_cause.replace(/_/g, ' ')}</strong><br />
-                  {a.zone}<br />
-                  Closure: {(a.closure_probability * 100).toFixed(1)}% &middot; Officers: {a.recommended_officers}
+                  {a.zone} · {(a.closure_probability * 100).toFixed(0)}% closure<br />
+                  Officers: {a.recommended_officers}
                 </Popup>
-              </CircleMarker>
-              
-              {a.footprint_radius_km > 0 && (
+              </Marker>
+
+              {baseRadius > 0 && (
                 <Circle
                   center={[a.latitude, a.longitude]}
-                  radius={a.footprint_radius_km * 1000}
-                  pathOptions={{ color, fillColor: color, fillOpacity: 0.08, weight: 1 }}
+                  radius={baseRadius}
+                  pathOptions={{
+                    color,
+                    fillColor: color,
+                    fillOpacity: 0.06,
+                    weight: 1,
+                    dashArray: '4, 4',
+                    opacity: 0.5,
+                  }}
                 />
               )}
             </React.Fragment>
           );
         })}
       </MapContainer>
+
+      {/* Vignette */}
+      <div className="map-vignette" />
+
+      {/* HUD overlay */}
+      <div className="map-hud-overlay">
+        {/* TL: Active count */}
+        <div className="map-hud-corner tl">
+          <span className="eyebrow">Active</span>
+          <span className="metric metric-sm">{totalActive} event{totalActive !== 1 ? 's' : ''}</span>
+        </div>
+
+        {/* TR: Critical count or CLEAR */}
+        <div className="map-hud-corner tr">
+          {criticalCount > 0
+            ? <span className="status-tag status-tag-high">{criticalCount} CRITICAL</span>
+            : <span className="status-tag status-tag-low">ALL CLEAR</span>
+          }
+        </div>
+
+        {/* BL: Highest risk zone */}
+        {highestRiskEvent && (
+          <div className="map-hud-corner bl">
+            <span className="eyebrow">Top Risk Zone</span>
+            <span className="metric metric-sm" style={{ color: riskColor(highestRiskEvent.advisory.closure_probability) }}>
+              {highestRiskEvent.advisory.zone}
+            </span>
+          </div>
+        )}
+
+        {/* BR: Tracking */}
+        {highestRiskEvent && (
+          <div className="map-hud-corner br">
+            <span className="eyebrow">Max Threat</span>
+            <span className={`status-tag ${riskTagClass(highestRiskEvent.advisory.closure_probability)}`}>
+              {riskLabel(highestRiskEvent.advisory.closure_probability)}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

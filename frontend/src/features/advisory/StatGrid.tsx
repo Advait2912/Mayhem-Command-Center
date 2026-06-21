@@ -39,7 +39,7 @@ export const StatGrid: React.FC<StatGridProps> = ({ advisory }) => {
   };
 
   return (
-    <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+    <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
       <StatBox 
         label="Congestion Score" 
         value={`${advisory.cascade_risk_score}/10`}

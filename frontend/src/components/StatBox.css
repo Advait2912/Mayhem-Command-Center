@@ -1,8 +1,8 @@
 .stat-box {
-  padding: 1rem 1.25rem;
+  padding: 0.6rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 3px;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -17,18 +17,19 @@
 }
 
 .stat-label {
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .stat-value {
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   font-weight: 700;
+  font-family: var(--font-mono);
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .stat-icon {

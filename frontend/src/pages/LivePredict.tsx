@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMeta } from '../hooks/useMeta';
 import { PredictRequest, Advisory } from '../services/types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -6,11 +6,12 @@ import { ErrorBox } from '../components/ErrorBox';
 import { LiveBoardMap } from '../features/advisory/LiveBoardMap';
 import { LiveEventCard } from '../features/advisory/LiveEventCard';
 import * as api from '../services/api';
+import { sessionStore, SESSION_KEYS } from '../services/sessionStore';
 
 interface LiveEvent {
   id: string;
   advisory: Advisory;
-  addedAt: Date;
+  addedAt: string; // ISO string (serializable for sessionStorage)
 }
 
 const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -22,24 +23,36 @@ const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const DEFAULT_FORM: PredictRequest = {
+  event_cause: '',
+  zone_filled: '',
+  latitude: 12.9716,
+  longitude: 77.5946,
+  start_datetime: new Date().toISOString().slice(0, 16),
+  description: '',
+  veh_type: '',
+  corridor: '',
+};
+
 export const LivePredict: React.FC = () => {
   const { data: meta, loading: metaLoading } = useMeta();
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+
+  // ── Restore live events from session ──────────────────────────
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>(() => {
+    return sessionStore.get<LiveEvent[]>(SESSION_KEYS.LIVE_EVENTS) ?? [];
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<PredictRequest>({
-    event_cause: '',
-    zone_filled: '',
-    latitude: 12.9716,
-    longitude: 77.5946,
-    start_datetime: new Date().toISOString().slice(0, 16),
-    description: '',
-    veh_type: '',
-    corridor: '',
-  });
+  const [form, setForm] = useState<PredictRequest>(DEFAULT_FORM);
 
   const [isStretch, setIsStretch] = useState(false);
+
+  // ── Persist live events whenever they change ───────────────────
+  useEffect(() => {
+    sessionStore.set(SESSION_KEYS.LIVE_EVENTS, liveEvents);
+  }, [liveEvents]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -72,11 +85,10 @@ export const LivePredict: React.FC = () => {
       const newEvent: LiveEvent = {
         id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         advisory,
-        addedAt: new Date(),
+        addedAt: new Date().toISOString(),
       };
       setLiveEvents(prev => [...prev, newEvent]);
-      setForm(prev => ({ ...prev, description: '' }));
-      setForm(prev => ({ ...prev, start_datetime: new Date().toISOString().slice(0, 16) }));
+      setForm(prev => ({ ...prev, description: '', start_datetime: new Date().toISOString().slice(0, 16) }));
     } catch (err: any) {
       setError(err.message || 'Failed to predict advisory');
     } finally {
@@ -90,18 +102,18 @@ export const LivePredict: React.FC = () => {
 
   const clearBoard = () => {
     setLiveEvents([]);
+    sessionStore.remove(SESSION_KEYS.LIVE_EVENTS);
   };
 
   const handleMapFocus = () => {
-    // Note: To really pan the map we'd need to pass this down or use a ref.
-    // For now we're just triggering a re-render. LiveBoardMap handles bounds via its BoundsUpdater.
+    // LiveBoardMap handles bounds via its BoundsUpdater.
   };
 
-  const findNearbyLiveEvents = (ev: LiveEvent, thresholdKm = 2) => {
+  const findNearbyLiveEvents = (ev: { id: string; advisory: Advisory; addedAt: Date }, thresholdKm = 2) => {
     const a = ev.advisory;
     if (a.latitude == null || a.longitude == null) return [];
     const out = [];
-    for (const other of liveEvents) {
+    for (const other of eventsWithDate) {
       if (other.id === ev.id) continue;
       const b = other.advisory;
       if (b.latitude == null || b.longitude == null) continue;
@@ -111,21 +123,45 @@ export const LivePredict: React.FC = () => {
     return out.sort((x, y) => x.distanceKm - y.distanceKm);
   };
 
-  const sortedEvents = [...liveEvents].sort((x, y) => {
-    const xHigh = x.advisory.priority && x.advisory.priority.label === 'HIGH' ? 1 : 0;
-    const yHigh = y.advisory.priority && y.advisory.priority.label === 'HIGH' ? 1 : 0;
-    if (xHigh !== yHigh) return yHigh - xHigh;
-    return y.addedAt.getTime() - x.addedAt.getTime();
-  });
+  // Convert back to a shape LiveEventCard expects (addedAt as Date)
+  const sortedEvents = [...liveEvents]
+    .sort((x, y) => {
+      const xHigh = x.advisory.priority && x.advisory.priority.label === 'HIGH' ? 1 : 0;
+      const yHigh = y.advisory.priority && y.advisory.priority.label === 'HIGH' ? 1 : 0;
+      if (xHigh !== yHigh) return yHigh - xHigh;
+      return new Date(y.addedAt).getTime() - new Date(x.addedAt).getTime();
+    });
+
+  // LiveBoardMap and LiveEventCard need Date objects for addedAt
+  const eventsWithDate = sortedEvents.map(ev => ({
+    ...ev,
+    addedAt: new Date(ev.addedAt),
+  }));
 
   return (
     <div style={{ display: 'flex', gap: '2rem', height: '100%', overflow: 'hidden' }}>
       {/* Left Column: Form */}
       <div style={{ flex: '0 0 450px', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', paddingRight: '1rem' }}>
-        <h2 style={{ marginBottom: '0.25rem', color: 'var(--text-primary)' }}>Add event to the live board</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-          Add events one at a time as reports come in. Each one runs through the full advisory pipeline and stays on the shared map.
-        </p>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 800,
+            fontSize: '18px',
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(120deg, #fff 20%, var(--accent-cyan) 55%, var(--accent-blue) 80%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            backgroundSize: '200% auto',
+            animation: 'shine 6s linear infinite',
+            marginBottom: '4px',
+          }}>
+            Add event to the live board
+          </div>
+          <div className="eyebrow" style={{ color: 'var(--accent-cyan)' }}>
+            Add events one at a time as reports come in. Each one runs through the full advisory pipeline and stays on the shared map.
+          </div>
+        </div>
         
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
           {metaLoading ? <LoadingSpinner message="Loading options..." /> : (
@@ -240,17 +276,17 @@ export const LivePredict: React.FC = () => {
           </button>
         </div>
 
-        <LiveBoardMap events={liveEvents} onMarkerClick={(id) => {
+        <LiveBoardMap events={eventsWithDate} onMarkerClick={(id) => {
           document.getElementById(`livecard-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }} />
 
         <div style={{ flex: '1', overflowY: 'auto', paddingRight: '0.5rem' }}>
-          {sortedEvents.length === 0 ? (
+          {eventsWithDate.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
               Add an event above — advisories will appear here and stack up as more events come in.
             </div>
           ) : (
-            sortedEvents.map(ev => (
+            eventsWithDate.map(ev => (
               <LiveEventCard 
                 key={ev.id} 
                 event={ev} 

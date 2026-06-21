@@ -29,7 +29,7 @@ export const RiskMeter: React.FC<RiskMeterProps> = ({ probability }) => {
   return (
     <div className="risk-meter panel-live">
       <div className="risk-meter-header">
-        <div className="eyebrow">RISK ASSESSMENT</div>
+        <div className="eyebrow gradient-text">Risk Assessment</div>
         <div className={`status-tag status-tag-${getClassificationClass()}`}>
           {getClassification()}
         </div>

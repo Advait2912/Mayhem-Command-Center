@@ -1,6 +1,6 @@
 .risk-meter {
   width: 100%;
-  padding: var(--space-5);
+  padding: var(--space-3) var(--space-4);
   background: var(--bg-panel);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -28,7 +28,7 @@
     rgba(229, 72, 77, 0.2) 100%
   );
   border-radius: var(--radius-sm);
-  margin: var(--space-4) 0;
+  margin: var(--space-2) 0;
   overflow: hidden;
 }
 
