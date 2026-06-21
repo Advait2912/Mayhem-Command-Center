@@ -53,14 +53,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
-# Large ML/Data Artifacts (Optional: uncomment to ignore large models/data)
-# backend/data/*.parquet
-# backend/data/*.graphml
-# backend/data/*.csv
-# backend/models/*.pkl
-# backend/models/*.cbm
-# backend/models/*.json
 # remove documentation and migration documents
 docs/
 migration/
