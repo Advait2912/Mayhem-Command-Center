@@ -14,6 +14,7 @@ No logic changes. All function signatures are identical to the original.
 
 import json
 import pickle
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -46,6 +47,7 @@ from backend.core.config import (
     CLOSURE_CALIBRATED_PATH, PRIORITY_CALIBRATED_PATH,
     CLOSURE_MODEL_PATH, PRIORITY_MODEL_PATH,
     DURATION_FAST_Q_PATHS, DURATION_SLOW_WEIBULL_PATH,
+    PENDING_EVENTS_PATH,
 )
 
 # Exact same num-feature list as in new_pipeline.stage6_duration -- copied
@@ -621,9 +623,26 @@ def _to_jsonable(obj):
 # Public orchestration entry points
 # ════════════════════════════════════════════════════════════════════════════
 
+def _persist_pending_event(event_id: str, row: pd.Series) -> None:
+    """Persists the full feature row for a newly predicted event, keyed by
+    event_id, so a later officer-submitted outcome can be joined back to
+    its original features and used to retrain the triage classifier (see
+    services/retrain.py). Plain CSV append -- cheap and avoids read-modify-
+    write races that a parquet rewrite would have under concurrent requests."""
+    all_features = TRIAGE_CAT_FEATURES + TRIAGE_NUM_FEATURES
+    record = {"event_id": event_id, "created_at": pd.Timestamp.utcnow().isoformat()}
+    for c in all_features:
+        record[c] = row[c]
+    out_df = pd.DataFrame([record])
+    write_header = not PENDING_EVENTS_PATH.exists()
+    out_df.to_csv(PENDING_EVENTS_PATH, mode="a", header=write_header, index=False)
+
+
 def build_advisory_for_new_event(raw: dict, ctx: InferenceContext) -> dict:
     row = featurize_new_event(raw, ctx)
     row = score_new_event(row, ctx)
+    event_id = uuid.uuid4().hex
+    _persist_pending_event(event_id, row)
     advisory = _build_advisory_new(
         row, ctx.df_hist, ctx.G_main, ctx.centrality, ctx.cbr_artifacts,
         fast_models=ctx.fast_models, fast_encoders=ctx.fast_encoders, all_features=ctx.duration_all_features,
@@ -635,6 +654,7 @@ def build_advisory_for_new_event(raw: dict, ctx: InferenceContext) -> dict:
         baseline_table=ctx.baseline_table.get("table", ctx.baseline_table), rainfall_forecast=None,
         ctx=ctx, top_k=3,
     )
+    advisory["event_id"] = event_id
     return _to_jsonable(advisory)
 
 

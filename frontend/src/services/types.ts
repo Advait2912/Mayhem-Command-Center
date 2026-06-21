@@ -137,6 +137,7 @@ export interface HistoricalPeakWindow {
 }
 
 export interface Advisory {
+  event_id?: string;
   event_cause: string;
   zone: string;
   closure_probability: number;

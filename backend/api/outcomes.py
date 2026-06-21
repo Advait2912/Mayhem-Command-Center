@@ -6,7 +6,7 @@ Source of truth: migration/API_CONTRACT.md → Endpoints 5 and 6.
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from backend.core.config import OUTCOMES_LOG_PATH
 from backend.schemas.outcomes import (
@@ -15,6 +15,7 @@ from backend.schemas.outcomes import (
     OutcomeListResponse,
     OutcomeRecord,
 )
+from backend.services.retrain import maybe_trigger_retrain
 
 router = APIRouter()
 
@@ -77,7 +78,7 @@ def api_list_outcomes():
 
 
 @router.post("/outcomes", response_model=OutcomeCreateResponse)
-def api_log_outcome(body: OutcomeCreateRequest):
+def api_log_outcome(body: OutcomeCreateRequest, background_tasks: BackgroundTasks):
     logged_at = datetime.now(timezone.utc).isoformat()
     record = {
         "logged_at": logged_at,
@@ -97,6 +98,11 @@ def api_log_outcome(body: OutcomeCreateRequest):
     row_df = pd.DataFrame([record])[OUTCOME_COLUMNS]
     write_header = (not OUTCOMES_LOG_PATH.exists()) or OUTCOMES_LOG_PATH.stat().st_size < 10
     row_df.to_csv(OUTCOMES_LOG_PATH, mode="a", header=write_header, index=False)
+
+    # Self-retraining loop: fires automatically every RETRAIN_BATCH_SIZE
+    # filled-in outcomes, no human approval gate. Runs after the response
+    # is sent so the officer's submit isn't blocked by training time.
+    background_tasks.add_task(maybe_trigger_retrain)
 
     clean = _sanitize_row(record)
     return OutcomeCreateResponse(

@@ -16,6 +16,14 @@ CENTRALITY_CACHE = DATA_DIR / "node_centrality.parquet"
 RAINFALL_CACHE = DATA_DIR / "rainfall_cache.parquet"
 GRAPH_PATH = DATA_DIR / "bengaluru_major_roads.graphml"
 OUTCOMES_LOG_PATH = DATA_DIR / "outcomes_log.csv"
+PENDING_EVENTS_PATH = DATA_DIR / "pending_events.csv"
+RETRAIN_LOG_PATH = DATA_DIR / "retrain_log.csv"
+
+# Self-retraining loop: every time this many *new* outcome rows with a
+# filled-in actual_required_closure accumulate, the triage closure model
+# retrains automatically in the background. No human approval gate -- see
+# services/retrain.py for the full loop.
+RETRAIN_BATCH_SIZE = 100
 
 # ── Model files ───────────────────────────────────────────────────────────────
 CBR_INDEX_PATH = MODELS_DIR / "cbr_index.pkl"

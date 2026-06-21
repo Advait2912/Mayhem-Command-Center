@@ -238,7 +238,7 @@ export const NewPredict: React.FC = () => {
         ) : advData ? (
           <>
             <EventMap advisory={advData} />
-            <AdvisoryPanel advisory={advData} />
+            <AdvisoryPanel advisory={advData} sourceEventId={advData.event_id} />
           </>
         ) : null}
       </div>
