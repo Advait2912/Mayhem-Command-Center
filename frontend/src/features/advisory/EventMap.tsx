@@ -97,7 +97,17 @@ interface EventMapProps {
   advisory: Advisory;
 }
 
+const getColors = () => {
+  const root = getComputedStyle(document.documentElement);
+  return {
+    danger: root.getPropertyValue('--status-danger').trim(),
+    warning: root.getPropertyValue('--status-warning').trim(),
+    success: root.getPropertyValue('--status-success').trim(),
+  };
+};
+
 export const EventMap: React.FC<EventMapProps> = ({ advisory }) => {
+  const COLORS = React.useMemo(() => getColors(), []);
   if (!advisory.latitude || !advisory.longitude) return null;
 
   const position: [number, number] = [advisory.latitude, advisory.longitude];
@@ -108,9 +118,9 @@ export const EventMap: React.FC<EventMapProps> = ({ advisory }) => {
     : 350;
 
   const riskColorRaw =
-    advisory.closure_probability >= 0.7 ? '#FFFFFF' :
-    advisory.closure_probability >= 0.4 ? '#A8ABB0' :
-    '#7C7F85';
+    advisory.closure_probability >= 0.7 ? COLORS.danger :
+    advisory.closure_probability >= 0.4 ? COLORS.warning :
+    COLORS.success;
 
   const riskColorVar =
     advisory.closure_probability >= 0.7 ? 'var(--status-danger)' :
@@ -137,6 +147,7 @@ export const EventMap: React.FC<EventMapProps> = ({ advisory }) => {
         overflow: 'hidden',
         borderRadius: 'var(--radius-lg)',
         position: 'relative',
+        boxShadow: `0 0 0 1px ${riskColorRaw}33, 0 0 14px ${riskColorRaw}22`,
       }}
     >
       <MapContainer

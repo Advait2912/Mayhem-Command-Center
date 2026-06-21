@@ -84,7 +84,17 @@ const MapController: React.FC<{ advisory: Advisory | null }> = ({ advisory }) =>
   return null;
 };
 
+const getColors = () => {
+  const root = getComputedStyle(document.documentElement);
+  return {
+    danger: root.getPropertyValue('--status-danger').trim(),
+    warning: root.getPropertyValue('--status-warning').trim(),
+    success: root.getPropertyValue('--status-success').trim(),
+  };
+};
+
 export const Dashboard: React.FC = () => {
+  const COLORS = React.useMemo(() => getColors(), []);
   const [filters, setFilters] = useState<{ cause?: string; zone?: string; limit: number; offset: number }>({
     limit: 10,
     offset: 0,
@@ -106,9 +116,9 @@ export const Dashboard: React.FC = () => {
   };
 
   const riskColorRaw = advisoryData
-    ? (advisoryData.closure_probability >= 0.7 ? '#FFFFFF'
-      : advisoryData.closure_probability >= 0.4 ? '#A8ABB0'
-      : '#7C7F85')
+    ? (advisoryData.closure_probability >= 0.7 ? COLORS.danger
+      : advisoryData.closure_probability >= 0.4 ? COLORS.warning
+      : COLORS.success)
     : '#FFFFFF';
 
   const riskColorVar = advisoryData
@@ -190,7 +200,7 @@ export const Dashboard: React.FC = () => {
           overflow: 'hidden',
           border: '1px solid rgba(255, 255, 255,0.2)',
           position: 'relative',
-          boxShadow: advisoryData ? `0 0 20px ${riskColorRaw}22` : 'none',
+          boxShadow: advisoryData ? `0 0 0 1px ${riskColorRaw}33, 0 0 14px ${riskColorRaw}22` : 'none',
           transition: 'box-shadow 0.4s ease',
         }}>
           <MapContainer

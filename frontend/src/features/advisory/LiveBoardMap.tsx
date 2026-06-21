@@ -89,8 +89,20 @@ const BoundsUpdater: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
   return null;
 };
 
-const riskColor = (prob: number) =>
-  prob >= 0.7 ? '#FFFFFF' : prob >= 0.4 ? '#A8ABB0' : '#7C7F85';
+const getColors = () => {
+  const root = getComputedStyle(document.documentElement);
+  return {
+    danger: root.getPropertyValue('--status-danger').trim(),
+    warning: root.getPropertyValue('--status-warning').trim(),
+    success: root.getPropertyValue('--status-success').trim(),
+  };
+};
+
+export const LiveBoardMap: React.FC<LiveBoardMapProps> = ({ events, onMarkerClick }) => {
+  const COLORS = React.useMemo(() => getColors(), []);
+  
+  const riskColor = (prob: number) =>
+    prob >= 0.7 ? COLORS.danger : prob >= 0.4 ? COLORS.warning : COLORS.success;
 
 const riskTagClass = (prob: number) =>
   prob >= 0.7 ? 'status-tag-high' : prob >= 0.4 ? 'status-tag-medium' : 'status-tag-low';
@@ -98,7 +110,7 @@ const riskTagClass = (prob: number) =>
 const riskLabel = (prob: number) =>
   prob >= 0.7 ? 'CRITICAL' : prob >= 0.4 ? 'ELEVATED' : 'MONITORING';
 
-export const LiveBoardMap: React.FC<LiveBoardMapProps> = ({ events, onMarkerClick }) => {
+
   const highestRiskEvent = events.length > 0
     ? [...events].sort((a, b) => b.advisory.closure_probability - a.advisory.closure_probability)[0]
     : null;
@@ -117,6 +129,7 @@ export const LiveBoardMap: React.FC<LiveBoardMapProps> = ({ events, onMarkerClic
         marginBottom: '0.75rem',
         border: criticalCount > 0 ? '1px solid var(--accent-live)' : '1px solid var(--border)',
         position: 'relative',
+        boxShadow: highestRiskEvent ? `0 0 0 1px ${riskColor(highestRiskEvent.advisory.closure_probability)}33, 0 0 14px ${riskColor(highestRiskEvent.advisory.closure_probability)}22` : 'none',
       }}
     >
       <MapContainer

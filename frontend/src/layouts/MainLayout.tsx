@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 
+type ApiStatus = 'checking' | 'online' | 'offline';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+const statusConfig = {
+  checking: { color: 'var(--text-muted)',     label: 'Checking...' },
+  online:   { color: 'var(--status-success)', label: 'System Operational' },
+  offline:  { color: 'var(--status-danger)',  label: 'System Offline' },
+};
+
 // Inline SVG icons (Feather/Lucide style)
 const IconHistory = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -38,6 +47,27 @@ export const MainLayout: React.FC = () => {
   const [clock, setClock] = useState(() =>
     new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   );
+  const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
+
+  const checkApi = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch(`${BASE_URL}/meta`, { signal: controller.signal });
+      if (!res.ok) throw new Error('not ok');
+      setApiStatus('online');
+    } catch {
+      setApiStatus('offline');
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  useEffect(() => {
+    checkApi();
+    const id = setInterval(checkApi, 15000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -137,9 +167,16 @@ export const MainLayout: React.FC = () => {
           }}>
             {clock} IST
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: '10px', color: 'var(--status-success)', marginTop: '4px' }}>
-            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--status-success)', display: 'inline-block' }} />
-            System Operational
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: '10px', color: statusConfig[apiStatus].color, marginTop: '4px' }}>
+            <span style={{ 
+              width: '5px', 
+              height: '5px', 
+              borderRadius: '50%', 
+              background: statusConfig[apiStatus].color, 
+              display: 'inline-block',
+              animation: apiStatus === 'online' ? 'dotPulse 2s ease-in-out infinite' : 'none'
+            }} />
+            {statusConfig[apiStatus].label}
           </div>
         </div>
       </aside>

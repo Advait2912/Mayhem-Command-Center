@@ -47,6 +47,13 @@ const riskLabel = (prob?: number | null) => {
   return 'Low';
 };
 
+const severityClass = (prob?: number | null) => {
+  if (prob == null) return '';
+  if (prob >= 0.7) return 'risk-high';
+  if (prob >= 0.4) return 'risk-medium';
+  return 'risk-low';
+};
+
 export const EventList: React.FC<EventListProps> = ({ events, selectedId, onSelect }) => {
   if (events.length === 0) {
     return (
@@ -63,7 +70,7 @@ export const EventList: React.FC<EventListProps> = ({ events, selectedId, onSele
         return (
             <div
               key={evt.id}
-              className={`feed-row${isSelected ? ' selected panel-live' : ''}`}
+              className={`feed-row${isSelected ? ` selected panel-live ${severityClass(evt.closure_probability)}` : ''}`}
               onClick={() => onSelect(evt.id)}
             >
 
