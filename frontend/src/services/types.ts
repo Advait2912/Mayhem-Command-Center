@@ -69,6 +69,8 @@ export interface RoutingResult {
   alt_route_exists: boolean;
   blocked_node_count: number;
   blocked_nodes: number[];
+  /** [[lat, lng], ...], same order as blocked_nodes. */
+  blocked_nodes_coordinates: [number, number][];
 }
 
 export interface DiversionRoute {
@@ -78,6 +80,8 @@ export interface DiversionRoute {
   travel_minutes: number;
   via: string;
   path_nodes: number[];
+  /** [[lat, lng], ...] tracing path_nodes in order. */
+  coordinates: [number, number][];
 }
 
 export interface SimilarEvent {
@@ -157,6 +161,8 @@ export interface Advisory {
   footprint_radius_km: number;
   routing?: RoutingResult | null;
   recommended_barricade_node?: number | null;
+  /** [lat, lng] for recommended_barricade_node, or null if none recommended. */
+  recommended_barricade_coordinates?: [number, number] | null;
   barricade_candidates_considered: number[];
   diversion_routes: DiversionRoute[];
   network_resilience?: NetworkResilienceResult | null;
