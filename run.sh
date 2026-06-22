@@ -13,8 +13,8 @@ echo "Starting GridLock Command Center..."
 echo "-> Starting backend on port 8000"
 source venv/bin/activate
 # Run from root directory so Python finds the 'backend' module
-uvicorn backend.main:app --port 8000 &
-BACKEND_PID=$!
+uvicorn backend.main:app --port 8000 --env-file .env &
+
 
 # Wait a moment for backend to initialize (models loading takes time)
 sleep 5

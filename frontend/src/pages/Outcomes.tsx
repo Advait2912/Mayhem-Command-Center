@@ -64,7 +64,19 @@ const TD: React.FC<{ children: React.ReactNode; style?: React.CSSProperties; tit
   </td>
 );
 
+const TrainingStatus: React.FC<{ used: boolean }> = ({ used }) => (
+  <span className="metric metric-sm" style={{ 
+    color: used ? 'var(--status-success)' : 'var(--status-warning)',
+    fontSize: '10px',
+    fontWeight: 700,
+    textTransform: 'uppercase'
+  }}>
+    {used ? 'Used' : 'Pending'}
+  </span>
+);
+
 export const Outcomes: React.FC = () => {
+
   const { data, loading, error, refresh } = useOutcomes();
 
   return (
@@ -119,13 +131,14 @@ export const Outcomes: React.FC = () => {
 
         {!loading && !error && data && data.outcomes.length > 0 && (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <thead>
-              <tr>
-                {['Logged At', 'Event', 'Closure pred.', 'Closure match', 'Officers pred.', 'Officers actual', 'Officer Δ', 'Duration', 'Notes'].map(h => (
-                  <TH key={h}>{h}</TH>
-                ))}
-              </tr>
-            </thead>
+             <thead>
+               <tr>
+                 {['Logged At', 'Event', 'Closure pred.', 'Closure match', 'Officers pred.', 'Officers actual', 'Officer Δ', 'Duration', 'Training', 'Notes'].map(h => (
+                   <TH key={h}>{h}</TH>
+                 ))}
+               </tr>
+             </thead>
+
             <tbody>
               {data.outcomes.map((row, idx) => {
                 const cl = closureMatch(row);
@@ -171,6 +184,9 @@ export const Outcomes: React.FC = () => {
                       <span className="metric metric-sm" style={{ color: 'var(--text-secondary)' }}>
                         {row.actual_duration_hrs != null ? `${row.actual_duration_hrs}h` : '—'}
                       </span>
+                    </TD>
+                    <TD>
+                      <TrainingStatus used={row.used_for_training} />
                     </TD>
                     <TD style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.notes || ''}>
                       {row.notes || '—'}

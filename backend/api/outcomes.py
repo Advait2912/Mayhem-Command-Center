@@ -4,11 +4,9 @@ Source of truth: migration/API_CONTRACT.md → Endpoints 5 and 6.
 """
 
 from datetime import datetime, timezone
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
-import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-
-from backend.core.config import OUTCOMES_LOG_PATH
+from backend.core.context import get_context
 from backend.schemas.outcomes import (
     OutcomeCreateRequest,
     OutcomeCreateResponse,
@@ -18,33 +16,6 @@ from backend.schemas.outcomes import (
 from backend.services.retrain import maybe_trigger_retrain
 
 router = APIRouter()
-
-# CSV column order — must match what legacy app.py wrote
-OUTCOME_COLUMNS = [
-    "logged_at",
-    "source_event_id",
-    "event_cause",
-    "zone",
-    "predicted_officers",
-    "predicted_closure_probability",
-    "predicted_cascade_risk_score",
-    "actual_officers_used",
-    "actual_duration_hrs",
-    "actual_required_closure",
-    "notes",
-]
-
-
-def _read_outcomes_df() -> pd.DataFrame:
-    if not OUTCOMES_LOG_PATH.exists() or OUTCOMES_LOG_PATH.stat().st_size < 10:
-        return pd.DataFrame(columns=OUTCOME_COLUMNS)
-    df = pd.read_csv(OUTCOMES_LOG_PATH, dtype=str)
-    # Ensure all expected columns exist
-    for col in OUTCOME_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
-    return df[OUTCOME_COLUMNS]
-
 
 def _sanitize_row(d: dict) -> dict:
     """Replace NaN / None / 'nan' with None for JSON safety. Mirrors app.py:102."""
@@ -63,25 +34,59 @@ def _sanitize_row(d: dict) -> dict:
 
 
 @router.get("/outcomes", response_model=OutcomeListResponse)
-def api_list_outcomes():
-    df = _read_outcomes_df()
-    if len(df) == 0:
+def api_list_outcomes(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0)
+):
+    ctx = get_context()
+    # Fetch records using the repository
+    records = ctx.outcomes_repo.list_outcomes(limit=limit, offset=offset)
+    
+    if not records:
         return OutcomeListResponse(count=0, outcomes=[])
 
-    # Sort descending by logged_at, return last 100
-    df = df.sort_values("logged_at", ascending=False).head(100)
     outcomes = []
-    for _, row in df.iterrows():
-        d = _sanitize_row(row.to_dict())
-        outcomes.append(OutcomeRecord(**d))
+    for r in records:
+        # The record from the repo might be a raw dict from Supabase or a CSV row
+        # We sanitize and map it to the OutcomeRecord schema
+        # Note: the repository returns the raw DB/CSV row, we must ensure it 
+        # maps correctly to OutcomeRecord fields.
+        clean = _sanitize_row(r)
+        
+        # If it's a Supabase record, it's nested in 'actual_outcome'
+        if "actual_outcome" in clean:
+            # Flat map the nested JSONB fields for the frontend
+            actuals = clean["actual_outcome"] or {}
+            combined = {
+                "logged_at": clean.get("created_at"),
+                "source_event_id": clean.get("event_payload", {}).get("source_event_id"),
+                "event_cause": clean.get("event_payload", {}).get("event_cause"),
+                "zone": clean.get("event_payload", {}).get("zone"),
+                "predicted_officers": clean.get("event_payload", {}).get("predicted_officers"),
+                "predicted_closure_probability": clean.get("event_payload", {}).get("predicted_closure_probability"),
+                "predicted_cascade_risk_score": clean.get("event_payload", {}).get("predicted_cascade_risk_score"),
+                "actual_officers_used": actuals.get("actual_officers_used"),
+                "actual_duration_hrs": actuals.get("actual_duration_hrs"),
+                "actual_required_closure": actuals.get("actual_required_closure"),
+                "notes": actuals.get("notes"),
+                "used_for_training": clean.get("used_for_training", False)
+            }
+            outcomes.append(OutcomeRecord(**combined))
+        else:
+            # It's a CSV row (flat)
+            outcomes.append(OutcomeRecord(**clean))
+
     return OutcomeListResponse(count=len(outcomes), outcomes=outcomes)
 
 
 @router.post("/outcomes", response_model=OutcomeCreateResponse)
 def api_log_outcome(body: OutcomeCreateRequest, background_tasks: BackgroundTasks):
-    logged_at = datetime.now(timezone.utc).isoformat()
+    ctx = get_context()
+    
+    # Prepare a flat record that both CSV and Supabase repositories can interpret
+    # We use the column names from the legacy CSV as the "interchange format"
     record = {
-        "logged_at": logged_at,
+        "logged_at": datetime.now(timezone.utc).isoformat(),
         "source_event_id": str(body.source_event_id) if body.source_event_id is not None else None,
         "event_cause": body.event_cause,
         "zone": body.zone,
@@ -94,14 +99,14 @@ def api_log_outcome(body: OutcomeCreateRequest, background_tasks: BackgroundTask
         "notes": body.notes or "",
     }
 
-    # Append to CSV — create with header if first write
-    row_df = pd.DataFrame([record])[OUTCOME_COLUMNS]
-    write_header = (not OUTCOMES_LOG_PATH.exists()) or OUTCOMES_LOG_PATH.stat().st_size < 10
-    row_df.to_csv(OUTCOMES_LOG_PATH, mode="a", header=write_header, index=False)
+    try:
+        # Store via repository
+        ctx.outcomes_repo.insert_outcome(record)
+    except Exception as e:
+        # Fail loudly as per requirement
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Self-retraining loop: fires automatically every RETRAIN_BATCH_SIZE
-    # filled-in outcomes, no human approval gate. Runs after the response
-    # is sent so the officer's submit isn't blocked by training time.
+    # Self-retraining loop: fires automatically
     background_tasks.add_task(maybe_trigger_retrain)
 
     clean = _sanitize_row(record)

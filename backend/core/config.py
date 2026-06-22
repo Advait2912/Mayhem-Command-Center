@@ -4,6 +4,7 @@ All paths are absolute, computed from this file's location.
 No relative paths anywhere in the backend.
 """
 from pathlib import Path
+import os
 
 # Root directories
 BACKEND_DIR = Path(__file__).parent.parent
@@ -18,6 +19,13 @@ GRAPH_PATH = DATA_DIR / "bengaluru_major_roads.graphml"
 OUTCOMES_LOG_PATH = DATA_DIR / "outcomes_log.csv"
 PENDING_EVENTS_PATH = DATA_DIR / "pending_events.csv"
 RETRAIN_LOG_PATH = DATA_DIR / "retrain_log.csv"
+
+# Supabase Configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
+IS_PRODUCTION = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+MODEL_CACHE_DIR = Path(os.getenv("MODEL_CACHE_DIR", "/tmp/model_cache"))
 
 # Self-retraining loop: every time this many *new* outcome rows with a
 # filled-in actual_required_closure accumulate, the triage closure model
