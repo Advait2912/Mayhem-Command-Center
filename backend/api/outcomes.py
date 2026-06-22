@@ -13,6 +13,7 @@ from backend.schemas.outcomes import (
     OutcomeListResponse,
     OutcomeRecord,
 )
+from backend.services.db.outcomes_repo import flatten_outcome_row
 from backend.services.retrain import maybe_trigger_retrain
 
 router = APIRouter()
@@ -47,34 +48,11 @@ def api_list_outcomes(
 
     outcomes = []
     for r in records:
-        # The record from the repo might be a raw dict from Supabase or a CSV row
-        # We sanitize and map it to the OutcomeRecord schema
-        # Note: the repository returns the raw DB/CSV row, we must ensure it 
-        # maps correctly to OutcomeRecord fields.
-        clean = _sanitize_row(r)
-        
-        # If it's a Supabase record, it's nested in 'actual_outcome'
-        if "actual_outcome" in clean:
-            # Flat map the nested JSONB fields for the frontend
-            actuals = clean["actual_outcome"] or {}
-            combined = {
-                "logged_at": clean.get("created_at"),
-                "source_event_id": clean.get("event_payload", {}).get("source_event_id"),
-                "event_cause": clean.get("event_payload", {}).get("event_cause"),
-                "zone": clean.get("event_payload", {}).get("zone"),
-                "predicted_officers": clean.get("event_payload", {}).get("predicted_officers"),
-                "predicted_closure_probability": clean.get("event_payload", {}).get("predicted_closure_probability"),
-                "predicted_cascade_risk_score": clean.get("event_payload", {}).get("predicted_cascade_risk_score"),
-                "actual_officers_used": actuals.get("actual_officers_used"),
-                "actual_duration_hrs": actuals.get("actual_duration_hrs"),
-                "actual_required_closure": actuals.get("actual_required_closure"),
-                "notes": actuals.get("notes"),
-                "used_for_training": clean.get("used_for_training", False)
-            }
-            outcomes.append(OutcomeRecord(**combined))
-        else:
-            # It's a CSV row (flat)
-            outcomes.append(OutcomeRecord(**clean))
+        # The record from the repo might be a raw dict from Supabase (nested
+        # in event_payload/actual_outcome jsonb) or a flat CSV row --
+        # flatten_outcome_row normalizes both to the OutcomeRecord shape.
+        clean = _sanitize_row(flatten_outcome_row(r))
+        outcomes.append(OutcomeRecord(**clean))
 
     return OutcomeListResponse(count=len(outcomes), outcomes=outcomes)
 
@@ -96,6 +74,7 @@ def api_log_outcome(body: OutcomeCreateRequest, background_tasks: BackgroundTask
         "actual_officers_used": body.actual_officers_used,
         "actual_duration_hrs": body.actual_duration_hrs,
         "actual_required_closure": body.actual_required_closure,
+        "actual_priority": body.actual_priority,
         "notes": body.notes or "",
     }
 

@@ -133,7 +133,7 @@ export const Outcomes: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
              <thead>
                <tr>
-                 {['Logged At', 'Event', 'Closure pred.', 'Closure match', 'Officers pred.', 'Officers actual', 'Officer Δ', 'Duration', 'Training', 'Notes'].map(h => (
+                 {['Logged At', 'Event', 'Closure pred.', 'Closure match', 'Officers pred.', 'Officers actual', 'Officer Δ', 'Duration', 'Priority', 'Training', 'Notes'].map(h => (
                    <TH key={h}>{h}</TH>
                  ))}
                </tr>
@@ -183,6 +183,11 @@ export const Outcomes: React.FC = () => {
                     <TD>
                       <span className="metric metric-sm" style={{ color: 'var(--text-secondary)' }}>
                         {row.actual_duration_hrs != null ? `${row.actual_duration_hrs}h` : '—'}
+                      </span>
+                    </TD>
+                    <TD>
+                      <span className="metric metric-sm" style={{ color: row.actual_priority === 'HIGH' ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                        {row.actual_priority ?? '—'}
                       </span>
                     </TD>
                     <TD>

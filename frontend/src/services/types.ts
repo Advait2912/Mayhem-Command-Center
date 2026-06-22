@@ -182,6 +182,7 @@ export interface OutcomeRecord {
   actual_officers_used?: number | null;
   actual_duration_hrs?: number | null;
   actual_required_closure?: "true" | "false" | null;
+  actual_priority?: "HIGH" | "LOW" | null;
   notes?: string | null;
   used_for_training?: boolean | null;
 }
@@ -201,6 +202,7 @@ export interface OutcomeCreateRequest {
   actual_officers_used?: number | null;
   actual_duration_hrs?: number | null;
   actual_required_closure?: string | null;
+  actual_priority?: string | null;
   notes?: string | null;
 }
 

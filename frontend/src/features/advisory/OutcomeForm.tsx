@@ -16,6 +16,7 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
   const [actualOfficers, setActualOfficers] = useState('');
   const [actualDuration, setActualDuration] = useState('');
   const [actualClosure, setActualClosure] = useState('');
+  const [actualPriority, setActualPriority] = useState('');
   const [notes, setNotes] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +35,7 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
         actual_officers_used: actualOfficers ? parseInt(actualOfficers) : undefined,
         actual_duration_hrs: actualDuration ? parseFloat(actualDuration) : undefined,
         actual_required_closure: actualClosure || undefined,
+        actual_priority: actualPriority || undefined,
         notes: notes || undefined,
       });
       setSuccess(true);
@@ -41,6 +43,7 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
       setActualOfficers('');
       setActualDuration('');
       setActualClosure('');
+      setActualPriority('');
       setNotes('');
     } catch (err: any) {
       setError(err.message || 'Failed to log outcome.');
@@ -61,7 +64,7 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Actual Officers Used</label>
             <input 
@@ -93,8 +96,20 @@ export const OutcomeForm: React.FC<OutcomeFormProps> = ({ advisory, sourceEventI
               <option value="false">No</option>
             </select>
           </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Actual Priority</label>
+            <select
+              value={actualPriority}
+              onChange={e => setActualPriority(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+            >
+              <option value="">-- Select --</option>
+              <option value="HIGH">High</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
         </div>
-        
+
         <div>
           <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '3px' }}>Notes</label>
           <textarea 

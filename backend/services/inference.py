@@ -47,8 +47,31 @@ from backend.core.config import (
     CLOSURE_CALIBRATED_PATH, PRIORITY_CALIBRATED_PATH,
     CLOSURE_MODEL_PATH, PRIORITY_MODEL_PATH,
     DURATION_FAST_Q_PATHS, DURATION_SLOW_WEIBULL_PATH,
-    PENDING_EVENTS_PATH,
+    PENDING_EVENTS_PATH, MODELS_DIR, USE_SUPABASE, IS_PRODUCTION,
 )
+
+import logging
+logger = logging.getLogger("gridlock")
+
+
+def _sync_models_from_supabase() -> None:
+    """Pulls whichever model version is marked active in Supabase down into
+    backend/models/ before anything below reads from disk, so a fresh
+    session always serves the latest promoted model (see model_manager.py)
+    instead of whatever artifacts happen to be sitting in the repo/image."""
+    if not USE_SUPABASE:
+        return
+    from backend.core.supabase_client import get_supabase_client
+    from backend.services.model_manager import download_active_model
+    try:
+        client = get_supabase_client()
+        version = download_active_model(client, MODELS_DIR)
+        logger.info(f"[ModelManager] Startup sync: now serving {version}")
+    except Exception as e:
+        if IS_PRODUCTION:
+            raise RuntimeError(f"CRITICAL: failed to pull active model from Supabase: {e}")
+        logger.warning(f"[ModelManager] Could not pull active model from Supabase "
+                        f"({e}); falling back to local backend/models/ on disk.")
 
 # Exact same num-feature list as in new_pipeline.stage6_duration -- copied
 # here because stage6_duration only returns it as a local variable, never
@@ -88,6 +111,8 @@ def load_artifacts() -> InferenceContext:
     import osmnx as ox
     from catboost import CatBoostClassifier
     import xgboost as xgb
+
+    _sync_models_from_supabase()
 
     ctx = InferenceContext()
 
@@ -633,13 +658,34 @@ def _persist_pending_event(event_id: str, row: pd.Series) -> None:
     its original features and used to retrain the triage classifier (see
     services/retrain.py). Plain CSV append -- cheap and avoids read-modify-
     write races that a parquet rewrite would have under concurrent requests."""
-    all_features = TRIAGE_CAT_FEATURES + TRIAGE_NUM_FEATURES
+    # DURATION_NUM_FEATURES_EXTRA (closure_probability, cascade_risk_score_v2)
+    # tag along too -- not used by the closure/priority classifiers, but
+    # required to retrain the duration models from live outcomes later.
+    all_features = TRIAGE_CAT_FEATURES + TRIAGE_NUM_FEATURES + DURATION_NUM_FEATURES_EXTRA
     record = {"event_id": event_id, "created_at": pd.Timestamp.utcnow().isoformat()}
     for c in all_features:
         record[c] = row[c]
-    out_df = pd.DataFrame([record])
-    write_header = not PENDING_EVENTS_PATH.exists()
-    out_df.to_csv(PENDING_EVENTS_PATH, mode="a", header=write_header, index=False)
+
+    file_exists = PENDING_EVENTS_PATH.exists() and PENDING_EVENTS_PATH.stat().st_size >= 10
+    if not file_exists:
+        pd.DataFrame([record]).to_csv(PENDING_EVENTS_PATH, mode="w", header=True, index=False)
+        return
+
+    # Schema-safe append: a column added here later (like the two
+    # DURATION_NUM_FEATURES_EXTRA columns just now) must not change the
+    # field count of a row appended to a file with an older, narrower
+    # header -- that silently misaligns every row read back afterwards.
+    existing_columns = pd.read_csv(PENDING_EVENTS_PATH, nrows=0).columns.tolist()
+    new_columns = [c for c in record.keys() if c not in existing_columns]
+    if new_columns:
+        full_df = pd.read_csv(PENDING_EVENTS_PATH)
+        for c in new_columns:
+            full_df[c] = None
+        full_df.to_csv(PENDING_EVENTS_PATH, mode="w", header=True, index=False)
+        existing_columns = existing_columns + new_columns
+
+    row_df = pd.DataFrame([record]).reindex(columns=existing_columns)
+    row_df.to_csv(PENDING_EVENTS_PATH, mode="a", header=False, index=False)
 
 
 def build_advisory_for_new_event(raw: dict, ctx: InferenceContext) -> dict:

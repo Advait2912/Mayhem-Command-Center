@@ -19,7 +19,9 @@ class OutcomeRecord(BaseModel):
     actual_officers_used: Optional[float] = None
     actual_duration_hrs: Optional[float] = None
     actual_required_closure: Optional[str] = None  # "true" | "false" | null
+    actual_priority: Optional[str] = None  # "HIGH" | "LOW" | null
     notes: Optional[str] = ""
+    used_for_training: Optional[bool] = None
 
 
 class OutcomeListResponse(BaseModel):
@@ -41,6 +43,7 @@ class OutcomeCreateRequest(BaseModel):
     actual_officers_used: Optional[float] = None
     actual_duration_hrs: Optional[float] = None
     actual_required_closure: Optional[str] = None
+    actual_priority: Optional[str] = None  # "HIGH" | "LOW"
     notes: Optional[str] = ""
 
 
