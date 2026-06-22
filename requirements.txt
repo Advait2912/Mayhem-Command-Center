@@ -13,3 +13,5 @@ xgboost
 lifelines
 pyarrow
 pydantic>=2.0
+supabase
+
