@@ -1,16 +1,32 @@
 @echo off
-echo Starting GridLock Command Center...
+setlocal enabledelayedexpansion
 
+echo === Starting GridLock Command Center ===
+
+:: 1️⃣ Start the FastAPI backend
 echo -^> Starting backend on port 8000
 call venv\Scripts\activate.bat
-start /B "GridLock Backend" uvicorn backend.main:app --port 8000
+start "" /B uvicorn backend.main:app --port 8000
 
-:: Wait a bit for backend to initialize
-timeout /t 2 /nobreak >nul
+:: Wait for backend to become responsive (poll /docs)
+set "attempts=0"
+:waitBackend
+if %attempts% GEQ 30 (
+    echo Backend did not become ready after %attempts% seconds – proceeding anyway.
+    goto :afterWait
+)
+timeout /t 1 /nobreak >nul
+curl -s http://localhost:8000/docs >nul 2>&1
+if errorlevel 1 (
+    set /A attempts+=1
+    echo Waiting for backend... (%attempts%s)
+    goto :waitBackend
+)
+:afterWait
 
 echo -^> Starting frontend on port 5173
 cd frontend
-start /B "GridLock Frontend" call npm run dev
+start "" /B npm run dev
 cd ..
 
 echo.
@@ -25,5 +41,4 @@ pause >nul
 echo Stopping servers...
 taskkill /F /IM node.exe >nul 2>&1
 taskkill /F /IM uvicorn.exe >nul 2>&1
-:: sometimes python processes linger
 taskkill /F /IM python.exe >nul 2>&1

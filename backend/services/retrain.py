@@ -394,7 +394,7 @@ def retrain_all_models() -> dict:
         else:
             model_id = "local"
             version = "local"
-
+            logger.info("[Retrain] CSV mode – new model artefacts written. Restart the backend to load the updated models.")
         record = {"retrained_at": started_at, "status": "completed",
                   **{f"{name}_status": r["status"] for name, r in results.items()}}
         _append_retrain_log(record)

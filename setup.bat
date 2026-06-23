@@ -1,19 +1,29 @@
 @echo off
-echo Setting up GridLock Command Center (Windows)...
+setlocal enabledelayedexpansion
 
-echo 1. Creating Python virtual environment...
+echo === Setting up GridLock Command Center (Windows) ===
+
+:: 1️⃣ Create Python virtual environment
+echo 1️⃣ Creating Python virtual environment...
 python -m venv venv
 call venv\Scripts\activate.bat
 
-echo 2. Installing Python dependencies...
-pip install -r requirements.txt
+echo ✅
 
-echo 3. Installing Node.js dependencies...
-cd frontend
-call npm install
-cd ..
+:: 2️⃣ Install Python dependencies
+echo 2️⃣ Installing Python dependencies...
+pip install -r requirements.txt >nul 2>&1
+echo ✅
+
+:: 3️⃣ Install Node.js dependencies
+echo 3️⃣ Installing Node.js dependencies...
+pushd frontend
+call npm install >nul 2>&1
+popd
+echo ✅
 
 echo --------------------------------------------------------
-echo [OK] Setup complete! You can now run the app with run.bat
+echo ✅ Setup complete! You can now run the app with run.bat
 echo --------------------------------------------------------
 pause
+

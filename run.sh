@@ -1,25 +1,30 @@
-#!/bin/bash
-
-# Exit script if any command fails
+#!/usr/bin/env bash
 set -e
 
-# Make sure we are in the right directory
+# Ensure we are in the repository root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-echo "Starting GridLock Command Center..."
+echo "=== Starting GridLock Command Center ==="
 
-# 1. Start the FastAPI backend
+# 1️⃣ Start the FastAPI backend
 echo "-> Starting backend on port 8000"
 source venv/bin/activate
-# Run from root directory so Python finds the 'backend' module
 uvicorn backend.main:app --port 8000 --env-file .env &
+BACKEND_PID=$!
 
+# Helper: wait until the backend responds (simple health check)
+wait_for_backend() {
+    echo -n "⏳ Waiting for backend to become ready"
+    while ! curl -s http://localhost:8000/docs > /dev/null; do
+        printf "."
+        sleep 1
+    done
+    echo " ✅"
+}
+wait_for_backend
 
-# Wait a moment for backend to initialize (models loading takes time)
-sleep 5
-
-# 2. Start the React frontend
+# 2️⃣ Start the React frontend (Vite)
 echo "-> Starting frontend on port 5173"
 cd frontend
 npm run dev &
@@ -32,10 +37,17 @@ echo "✅ GridLock is running!"
 echo "   Frontend UI: http://localhost:5173"
 echo "   Backend API: http://localhost:8000/docs"
 echo "========================================="
+
 echo "Press Ctrl+C to stop both servers."
 
-# Trap SIGINT (Ctrl+C) and SIGTERM to kill both background processes
-trap "echo 'Stopping servers...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM EXIT
+# Graceful shutdown: kill both background processes on exit
+cleanup() {
+    echo "\nStopping servers..."
+    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
+    exit 0
+}
+trap cleanup SIGINT SIGTERM EXIT
 
-# Keep script running
+# Wait for both processes to finish (will keep script alive until user aborts)
 wait $BACKEND_PID $FRONTEND_PID
+
