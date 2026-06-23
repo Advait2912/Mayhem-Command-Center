@@ -19,3 +19,4 @@ class MetaResponse(BaseModel):
     veh_types: List[str]
     event_count: int
     zone_centroids: Dict[str, ZoneCentroid]
+    model_version: str

@@ -54,25 +54,6 @@ import logging
 logger = logging.getLogger("gridlock")
 
 
-def _sync_models_from_supabase() -> None:
-    """Pulls whichever model version is marked active in Supabase down into
-    backend/models/ before anything below reads from disk, so a fresh
-    session always serves the latest promoted model (see model_manager.py)
-    instead of whatever artifacts happen to be sitting in the repo/image."""
-    if not USE_SUPABASE:
-        return
-    from backend.core.supabase_client import get_supabase_client
-    from backend.services.model_manager import download_active_model
-    try:
-        client = get_supabase_client()
-        version = download_active_model(client, MODELS_DIR)
-        logger.info(f"[ModelManager] Startup sync: now serving {version}")
-    except Exception as e:
-        if IS_PRODUCTION:
-            raise RuntimeError(f"CRITICAL: failed to pull active model from Supabase: {e}")
-        logger.warning(f"[ModelManager] Could not pull active model from Supabase "
-                        f"({e}); falling back to local backend/models/ on disk.")
-
 # Exact same num-feature list as in new_pipeline.stage6_duration -- copied
 # here because stage6_duration only returns it as a local variable, never
 # persisted by itself (it IS returned by stage6_duration, but we don't run
@@ -111,8 +92,6 @@ def load_artifacts() -> InferenceContext:
     import osmnx as ox
     from catboost import CatBoostClassifier
     import xgboost as xgb
-
-    _sync_models_from_supabase()
 
     ctx = InferenceContext()
 

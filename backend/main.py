@@ -24,19 +24,41 @@ from backend.core.context import set_context
 from backend.core.supabase_client import get_supabase_client
 from backend.services.inference import load_artifacts
 from backend.services.db.outcomes_repo import CsvOutcomesRepository, SupabaseOutcomesRepository
-from backend.services.db.retraining_repo import NoopRetrainingRepository
+from backend.services.db.retraining_repo import (
+    NoopRetrainingRepository,
+    SupabaseRetrainingRepository,
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gridlock")
 
+from backend.services.model_manager import download_version
+
+def startup_sync(client) -> str:
+    """Check active version and download if it's not v1."""
+    rows = client.table("models").select("version").eq("status", "active").execute().data
+    if not rows:
+        logger.warning("[MODEL] No active model in Supabase, using git baseline (v1)")
+        return "v1"
+        
+    version = rows[0]["version"]
+    if version == "v1":
+        logger.info("[MODEL] Active version is v1. Using git baseline.")
+        return "v1"
+        
+    logger.info(f"[MODEL] Active version found: {version}. Downloading 8 artifacts...")
+    download_version(client, version)
+    return version
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: load all artifacts once at startup."""
     print("[GridLock] Loading artifacts — this takes ~10-25 seconds on first start...")
-    ctx = load_artifacts()
     
-    # ── Repository Wiring ──────────────────────────────────────────────────────
+    model_version = "v1"
+    
+    # ── Repository Wiring & Sync ──────────────────────────────────────────────
     if USE_SUPABASE:
         logger.info("[DB] Mode: Supabase")
         try:
@@ -45,22 +67,32 @@ async def lifespan(app: FastAPI):
             client.table("models").select("id").limit(1).execute()
             logger.info("[DB] Health check passed")
             
-            ctx.outcomes_repo = SupabaseOutcomesRepository(client)
-            ctx.retraining_repo = NoopRetrainingRepository() 
+            ctx_outcomes_repo = SupabaseOutcomesRepository(client)
+            ctx_retraining_repo = SupabaseRetrainingRepository(client)
+            
+            # Sync Models
+            model_version = startup_sync(client)
+            
         except Exception as e:
-            logger.error(f"[DB] Health check failed: {e}")
+            logger.error(f"[DB] Health check or sync failed: {e}")
             if IS_PRODUCTION:
                 # Fail fast in production
-                raise RuntimeError(f"CRITICAL: Supabase connectivity failed in production: {e}")
+                raise RuntimeError(f"CRITICAL: Supabase connectivity/sync failed in production: {e}")
             else:
                 # In local dev, we fall back if Supabase was configured but is unreachable
                 logger.warning("[DB] Falling back to CSV due to Supabase failure in local mode.")
-                ctx.outcomes_repo = CsvOutcomesRepository(OUTCOMES_LOG_PATH)
-                ctx.retraining_repo = NoopRetrainingRepository()
+                ctx_outcomes_repo = CsvOutcomesRepository(OUTCOMES_LOG_PATH)
+                ctx_retraining_repo = NoopRetrainingRepository()
     else:
         logger.info("[DB] Mode: CSV")
-        ctx.outcomes_repo = CsvOutcomesRepository(OUTCOMES_LOG_PATH)
-        ctx.retraining_repo = NoopRetrainingRepository()
+        ctx_outcomes_repo = CsvOutcomesRepository(OUTCOMES_LOG_PATH)
+        ctx_retraining_repo = NoopRetrainingRepository()
+
+    ctx = load_artifacts()
+    ctx.outcomes_repo = ctx_outcomes_repo
+    ctx.retraining_repo = ctx_retraining_repo
+    ctx.model_version = model_version
+    logger.info(f"[MODEL] Loaded {model_version} successfully. Ready to serve.")
 
     set_context(ctx)
     print(f"[GridLock] Ready. {len(ctx.df_hist)} events loaded, "

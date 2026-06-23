@@ -40,4 +40,5 @@ def api_meta():
         veh_types=veh_types,
         event_count=event_count,
         zone_centroids=zone_centroids,
+        model_version=getattr(ctx, "model_version", "v1"),
     )

@@ -34,21 +34,28 @@ MODEL_CACHE_DIR = Path(os.getenv("MODEL_CACHE_DIR", "/tmp/model_cache"))
 RETRAIN_BATCH_SIZE = 100
 
 # ── Model files ───────────────────────────────────────────────────────────────
-CBR_INDEX_PATH = MODELS_DIR / "cbr_index.pkl"
-BASELINE_CACHE = MODELS_DIR / "baseline_table.pkl"
-TARGET_ENCODING_PATH = MODELS_DIR / "target_encoding_maps.json"
-CASCADE_SCALER_PATH = MODELS_DIR / "cascade_risk_scaler.json"
-PRIORITY_THRESHOLD_PATH = MODELS_DIR / "priority_threshold.json"
-CLOSURE_CALIBRATED_PATH = MODELS_DIR / "triage_model_closure_calibrated.pkl"
-PRIORITY_CALIBRATED_PATH = MODELS_DIR / "triage_model_priority_calibrated.pkl"
-CLOSURE_MODEL_PATH = MODELS_DIR / "triage_model_closure.cbm"
-PRIORITY_MODEL_PATH = MODELS_DIR / "triage_model_priority.cbm"
-DURATION_SLOW_WEIBULL_PATH = MODELS_DIR / "duration_model_slow_weibull.pkl"
+STATIC_MODELS_DIR = MODELS_DIR / "static"
+VERSIONED_MODELS_DIR = MODELS_DIR / "versioned"
+
+# Static
+CBR_INDEX_PATH = STATIC_MODELS_DIR / "cbr_index.pkl"
+BASELINE_CACHE = STATIC_MODELS_DIR / "baseline_table.pkl"
+TARGET_ENCODING_PATH = STATIC_MODELS_DIR / "target_encoding_maps.json"
+CASCADE_SCALER_PATH = STATIC_MODELS_DIR / "cascade_risk_scaler.json"
+CLOSURE_THRESHOLD_PATH = STATIC_MODELS_DIR / "closure_threshold.json"
+PRIORITY_THRESHOLD_PATH = STATIC_MODELS_DIR / "priority_threshold.json"
+
+# Versioned
+CLOSURE_MODEL_PATH = VERSIONED_MODELS_DIR / "triage_model_closure.cbm"
+CLOSURE_CALIBRATED_PATH = VERSIONED_MODELS_DIR / "triage_model_closure_calibrated.pkl"
+PRIORITY_MODEL_PATH = VERSIONED_MODELS_DIR / "triage_model_priority.cbm"
+PRIORITY_CALIBRATED_PATH = VERSIONED_MODELS_DIR / "triage_model_priority_calibrated.pkl"
+DURATION_SLOW_WEIBULL_PATH = VERSIONED_MODELS_DIR / "duration_model_slow_weibull.pkl"
 
 DURATION_FAST_Q_PATHS = {
-    0.1: MODELS_DIR / "duration_model_fast_q10.json",
-    0.5: MODELS_DIR / "duration_model_fast_q50.json",
-    0.9: MODELS_DIR / "duration_model_fast_q90.json",
+    0.1: VERSIONED_MODELS_DIR / "duration_model_fast_q10.json",
+    0.5: VERSIONED_MODELS_DIR / "duration_model_fast_q50.json",
+    0.9: VERSIONED_MODELS_DIR / "duration_model_fast_q90.json",
 }
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

@@ -1,35 +1,9 @@
 """
-services/retrain.py — Self-retraining loop for all four triage/duration
-models (closure, priority, duration-fast, duration-slow).
-
-Trigger: every time RETRAIN_BATCH_SIZE (see core/config.py) new outcomes
-accumulate -- counted via the active OutcomesRepository, so this works
-whether outcomes live in outcomes_log.csv (dev) or the Supabase `outcomes`
-table (prod) -- all four models retrain in the background. See
-api/outcomes.py for the trigger check that fires this after every
-POST /api/outcomes.
-
-Every retrain is a FULL refit on (historical parquet rows + every
-outcome-labeled live row collected so far), not an incremental update --
-same pattern the original closure-only version used. Each model has its
-own ground-truth label and is skipped independently if there isn't enough
-labeled data yet for it; one model having no data never blocks the others.
-
-Where the labeled data comes from: every POST /api/predict persists the
-full feature row it computed for that event, keyed by a generated event_id
-(see inference.py::_persist_pending_event). When an officer later logs the
-real outcome for that event, the outcome row carries that same id as
-source_event_id. Joining the two on that id reconstructs a fully-featured,
-correctly-labeled training row.
-
-Artifacts are written to backend/models/ as before; if Supabase is
-configured, the whole folder is also pushed to Storage as the next
-incrementing version and promoted to active (see model_manager.py), so the
-next process start pulls the freshly retrained models instead of whatever
-was baked into the image.
+services/retrain.py — Self-retraining loop for all four triage/duration models.
 """
 
 import logging
+import gc
 from datetime import datetime, timezone
 
 import numpy as np
@@ -39,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from backend.core.config import (
     ENRICHED_PATH, PENDING_EVENTS_PATH, RETRAIN_LOG_PATH, RETRAIN_BATCH_SIZE,
-    MODELS_DIR, USE_SUPABASE,
+    VERSIONED_MODELS_DIR, USE_SUPABASE,
     CLOSURE_MODEL_PATH, CLOSURE_CALIBRATED_PATH,
     PRIORITY_MODEL_PATH, PRIORITY_CALIBRATED_PATH,
     DURATION_FAST_Q_PATHS, DURATION_SLOW_WEIBULL_PATH,
@@ -50,6 +24,7 @@ from backend.services.pipeline import (
     TRIAGE_CAT_FEATURES, TRIAGE_NUM_FEATURES, DURATION_NUM_FEATURES_EXTRA,
     manual_oof_predict_proba, fit_isotonic_calibrator, LabelEncoder,
 )
+from backend.services.model_manager import upload_model_files, promote_version_in_db
 
 logger = logging.getLogger("gridlock")
 
@@ -62,13 +37,9 @@ AFT_NUM_FEATURES = [
     "is_heavy_vehicle", "closure_probability",
 ]
 
+_is_retraining: bool = False
 
 def _append_retrain_log(record: dict) -> None:
-    """Schema-safe append -- a failed run logs {retrained_at, status, error}
-    while a completed run logs a different key set (per-model statuses), so
-    a plain to_csv(mode='a') would misalign columns the moment the two
-    shapes interleave. Widen the file's header instead of letting that
-    happen (same fix as CsvOutcomesRepository.insert_outcome)."""
     file_exists = RETRAIN_LOG_PATH.exists() and RETRAIN_LOG_PATH.stat().st_size >= 10
     if not file_exists:
         pd.DataFrame([record]).to_csv(RETRAIN_LOG_PATH, mode="w", header=True, index=False)
@@ -86,10 +57,7 @@ def _append_retrain_log(record: dict) -> None:
     row_df = pd.DataFrame([record]).reindex(columns=existing_columns)
     row_df.to_csv(RETRAIN_LOG_PATH, mode="a", header=False, index=False)
 
-
 def _all_outcomes() -> list[dict]:
-    """Pages through every outcome via the active repository -- CSV or
-    Supabase -- and flattens each to a common shape."""
     ctx = get_context()
     rows, offset, page = [], 0, 1000
     while True:
@@ -102,13 +70,7 @@ def _all_outcomes() -> list[dict]:
         offset += page
     return rows
 
-
 def _load_labeled_rows() -> pd.DataFrame:
-    """Joins every outcome back to its original feature row in
-    pending_events.csv -- the one place full features are always persisted
-    locally, regardless of which OutcomesRepository is active. Returns one
-    row per outcome that could be matched, carrying both the outcome's
-    actual_* labels and the original feature columns."""
     outcomes = pd.DataFrame(_all_outcomes())
     if outcomes.empty:
         return pd.DataFrame()
@@ -125,27 +87,20 @@ def _load_labeled_rows() -> pd.DataFrame:
     )
     return merged
 
-
-def _filled_outcomes_count() -> int:
-    return len(_all_outcomes())
-
-
 def maybe_trigger_retrain() -> None:
-    """Called as a FastAPI BackgroundTask after every outcome submission.
-    Fires a retrain only on the exact request that crosses a new multiple
-    of RETRAIN_BATCH_SIZE, so it doesn't refire on every subsequent call."""
-    count = _filled_outcomes_count()
-    if count > 0 and count % RETRAIN_BATCH_SIZE == 0:
-        retrain_all_models()
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# Closure model
-# ════════════════════════════════════════════════════════════════════════════
+    global _is_retraining
+    if _is_retraining:
+        return
+    ctx = get_context()
+    count = ctx.outcomes_repo.count_unused_outcomes()
+    if count >= RETRAIN_BATCH_SIZE:
+        _is_retraining = True
+        try:
+            retrain_all_models()
+        finally:
+            _is_retraining = False
 
 def retrain_closure_model(merged: pd.DataFrame) -> dict:
-    """Refits the closure classifier on historical rows + every live
-    outcome with a usable actual_required_closure label."""
     from catboost import CatBoostClassifier
 
     if merged.empty:
@@ -177,7 +132,7 @@ def retrain_closure_model(merged: pd.DataFrame) -> dict:
     y = model_df["requires_road_closure"].astype(int)
     X = model_df[ALL_FEATURES]
     pos_rate = y.mean()
-    scale_pos_weight = (1 - pos_rate) / pos_rate
+    scale_pos_weight = (1 - pos_rate) / pos_rate if pos_rate > 0 else 1.0
     cat_idx = [X.columns.get_loc(c) for c in TRIAGE_CAT_FEATURES]
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
@@ -189,7 +144,7 @@ def retrain_closure_model(merged: pd.DataFrame) -> dict:
         )
 
     oof_proba = manual_oof_predict_proba(make_estimator, X, y, skf)
-    oof_auc = float(roc_auc_score(y, oof_proba))
+    oof_auc = float(roc_auc_score(y, oof_proba)) if len(np.unique(y)) > 1 else 0.0
 
     calibrator = fit_isotonic_calibrator(oof_proba, y.values)
     import pickle
@@ -210,14 +165,7 @@ def retrain_closure_model(merged: pd.DataFrame) -> dict:
         "oof_auc": round(oof_auc, 4),
     }
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# Priority model
-# ════════════════════════════════════════════════════════════════════════════
-
 def retrain_priority_model(merged: pd.DataFrame) -> dict:
-    """Refits the priority classifier on historical rows + every live
-    outcome with a usable actual_priority label (HIGH/LOW)."""
     from catboost import CatBoostClassifier
 
     if merged.empty or "actual_priority" not in merged.columns:
@@ -261,7 +209,7 @@ def retrain_priority_model(merged: pd.DataFrame) -> dict:
         )
 
     oof_proba = manual_oof_predict_proba(make_estimator, X, y, skf)
-    oof_auc = float(roc_auc_score(y, oof_proba))
+    oof_auc = float(roc_auc_score(y, oof_proba)) if len(np.unique(y)) > 1 else 0.0
 
     calibrator = fit_isotonic_calibrator(oof_proba, y.values)
     import pickle
@@ -282,23 +230,7 @@ def retrain_priority_model(merged: pd.DataFrame) -> dict:
         "oof_auc": round(oof_auc, 4),
     }
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# Duration models -- fast track (XGBoost quantile regressors)
-# ════════════════════════════════════════════════════════════════════════════
-
 def retrain_duration_fast_model(merged: pd.DataFrame) -> dict:
-    """Refits the fast-track quantile regressors on historical fast-track
-    rows + live outcomes with a usable actual_duration_hrs, for events that
-    were triaged to the fast track (model_track == 'fast').
-
-    Encoders: inference.py reconstructs fast_encoders deterministically by
-    re-fitting LabelEncoder on backend.df_hist's fast-track rows alone (see
-    the GAP FILL comment in inference.load_artifacts) -- it does not know
-    about this retrain. To stay compatible with that reconstruction, the
-    encoders here are fit the same way (historical fast-track rows only);
-    any live row whose categorical value isn't in that historical
-    vocabulary is dropped rather than crashing the encoder."""
     import xgboost as xgb
 
     all_features = ALL_FEATURES + DURATION_NUM_FEATURES_EXTRA
@@ -357,18 +289,7 @@ def retrain_duration_fast_model(merged: pd.DataFrame) -> dict:
         "n_dropped_unseen_category": n_dropped_unseen,
     }
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# Duration models -- slow track (Weibull AFT survival model)
-# ════════════════════════════════════════════════════════════════════════════
-
 def retrain_duration_slow_model(merged: pd.DataFrame) -> dict:
-    """Refits the slow-track Weibull AFT model on historical slow-track
-    rows (some censored) + live outcomes with a usable actual_duration_hrs
-    for events triaged to the slow track. Officers only log a final
-    actual_duration_hrs after a case is resolved, so every live row counts
-    as an observed (non-censored) event -- there is no "still open" status
-    being captured to make any of them censored."""
     from lifelines import WeibullAFTFitter
 
     hist = pd.read_parquet(ENRICHED_PATH)
@@ -395,7 +316,7 @@ def retrain_duration_slow_model(merged: pd.DataFrame) -> dict:
             for c in AFT_NUM_FEATURES:
                 live[c] = pd.to_numeric(live[c], errors="coerce")
             live["survival_time_hrs"] = live["actual_duration_hrs"].clip(upper=2000)
-            live["event_observed"] = 1  # always observed -- see docstring
+            live["event_observed"] = 1
             new_rows = live[AFT_CAT_FEATURES + AFT_NUM_FEATURES + ["survival_time_hrs", "event_observed"]].copy()
 
     if new_rows.empty:
@@ -403,8 +324,6 @@ def retrain_duration_slow_model(merged: pd.DataFrame) -> dict:
 
     hist_rows = hist_slow[AFT_CAT_FEATURES + AFT_NUM_FEATURES + ["survival_time_hrs", "event_observed"]].copy()
     aft_df = pd.concat([hist_rows, new_rows], ignore_index=True)
-    # A handful of historical rows have NaN hour_ist/month (failed datetime
-    # parsing upstream) -- WeibullAFTFitter can't fit through NaN covariates.
     aft_df = aft_df.dropna(subset=AFT_NUM_FEATURES + AFT_CAT_FEATURES)
     aft_df = pd.get_dummies(aft_df, columns=AFT_CAT_FEATURES, drop_first=True)
 
@@ -423,63 +342,74 @@ def retrain_duration_slow_model(merged: pd.DataFrame) -> dict:
         "concordance": round(float(aft_final.concordance_index_), 4),
     }
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# Orchestrator
-# ════════════════════════════════════════════════════════════════════════════
-
-def _push_to_supabase(metrics: dict) -> None:
-    """Pushes the freshly retrained backend/models/ folder to Supabase
-    Storage as the next version and promotes it. A failed push never
-    rolls back the local retrain -- the new artifacts are already correct
-    and serving locally; only the cloud sync didn't make it through."""
-    if not USE_SUPABASE:
-        return
-    from backend.core.supabase_client import get_supabase_client
-    from backend.services.model_manager import upload_new_version
-    try:
-        client = get_supabase_client()
-        upload_new_version(client, metrics, MODELS_DIR)
-    except Exception as e:
-        logger.error(f"[ModelManager] Push to Supabase failed (local artifacts still updated): {e}")
-
-
 def retrain_all_models() -> dict:
-    """Retrains closure, priority, and both duration models in one pass,
-    each independently skipped if it doesn't have enough labeled data yet.
-    Always logs to RETRAIN_LOG_PATH and reports through retraining_repo."""
     started_at = datetime.now(timezone.utc).isoformat()
     ctx = get_context()
     run_id = ctx.retraining_repo.start_run()
+    logger.info(f"[Retrain] Started run {run_id}")
 
     try:
         merged = _load_labeled_rows()
+        results = {}
 
-        results = {
-            "closure": retrain_closure_model(merged),
-            "priority": retrain_priority_model(merged),
-            "duration_fast": retrain_duration_fast_model(merged),
-            "duration_slow": retrain_duration_slow_model(merged),
-        }
+        # ── Closure ─────────────────────────────────────────────────────────────
+        logger.info("[Retrain] Training Closure model...")
+        results["closure"] = retrain_closure_model(merged)
+        gc.collect()
+
+        # ── Priority ────────────────────────────────────────────────────────────
+        logger.info("[Retrain] Training Priority model...")
+        results["priority"] = retrain_priority_model(merged)
+        gc.collect()
+
+        # ── Duration Fast ───────────────────────────────────────────────────────
+        logger.info("[Retrain] Training Duration Fast model...")
+        results["duration_fast"] = retrain_duration_fast_model(merged)
+        gc.collect()
+
+        # ── Duration Slow ───────────────────────────────────────────────────────
+        logger.info("[Retrain] Training Duration Slow model...")
+        results["duration_slow"] = retrain_duration_slow_model(merged)
+        gc.collect()
 
         any_retrained = any(r["status"] == "retrained" for r in results.values())
-        if any_retrained:
-            _push_to_supabase(results)
+        
+        # ── Batch Upload & Promote ──────────────────────────────────────────────
+        if USE_SUPABASE and any_retrained:
+            from backend.core.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            
+            paths_to_upload = [
+                CLOSURE_MODEL_PATH, CLOSURE_CALIBRATED_PATH,
+                PRIORITY_MODEL_PATH, PRIORITY_CALIBRATED_PATH,
+                DURATION_FAST_Q_PATHS[0.1], DURATION_FAST_Q_PATHS[0.5], DURATION_FAST_Q_PATHS[0.9],
+                DURATION_SLOW_WEIBULL_PATH
+            ]
+            
+            logger.info("[Retrain] Uploading 8 versioned artifacts to Supabase Storage...")
+            version = upload_model_files(client, paths_to_upload)
+            
+            logger.info(f"[Retrain] Inserting candidate and promoting version {version}...")
+            model_id = promote_version_in_db(client, version, results, CLOSURE_MODEL_PATH.name)
+        else:
+            model_id = "local"
+            version = "local"
 
         record = {"retrained_at": started_at, "status": "completed",
                   **{f"{name}_status": r["status"] for name, r in results.items()}}
         _append_retrain_log(record)
+        ctx.outcomes_repo.mark_used_for_training()
         ctx.retraining_repo.complete_run(
-            run_id, model_id="local", metrics=results, rows_used=int(len(merged)),
+            run_id, model_id=model_id, metrics=results, rows_used=int(len(merged)),
         )
+        logger.info(f"[Retrain] Run {run_id} completed successfully.")
         return results
 
     except Exception as e:
         _append_retrain_log({"retrained_at": started_at, "status": "failed", "error": str(e)})
         ctx.retraining_repo.fail_run(run_id, str(e))
+        logger.error(f"[Retrain] Failed — current active model unchanged. Error: {e}")
         return {"status": "failed", "error": str(e)}
 
-
-# Backwards-compatible name -- older callers/tests may still reference this.
 def retrain_triage_closure_model() -> dict:
     return retrain_closure_model(_load_labeled_rows())

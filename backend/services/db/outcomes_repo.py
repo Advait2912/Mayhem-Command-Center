@@ -4,10 +4,19 @@ class OutcomesRepository(Protocol):
     def list_outcomes(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """Retrieve a list of outcome records, ordered by creation date descending."""
         ...
-
+ 
     def insert_outcome(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Insert a new outcome record into the store."""
         ...
+ 
+    def count_unused_outcomes(self) -> int:
+        """Returns the number of outcomes that have not yet been marked used_for_training."""
+        ...
+ 
+    def mark_used_for_training(self) -> None:
+        """Marks all currently unused outcomes as used_for_training."""
+        ...
+
 
 
 # Fields an officer fills in after the fact -- the ground-truth labels used
@@ -75,11 +84,11 @@ class CsvOutcomesRepository:
     def insert_outcome(self, record: Dict[str, Any]) -> Dict[str, Any]:
         import pandas as pd
         file_exists = self.log_path.exists() and self.log_path.stat().st_size >= 10
-
+ 
         if not file_exists:
             pd.DataFrame([record]).to_csv(self.log_path, mode="w", header=True, index=False)
             return record
-
+ 
         # Schema-safe append: if this record introduces columns the file's
         # header doesn't have yet (e.g. a newly added outcome field), widen
         # the existing file first instead of writing a row with a different
@@ -93,10 +102,23 @@ class CsvOutcomesRepository:
                 full_df[c] = None
             full_df.to_csv(self.log_path, mode="w", header=True, index=False)
             existing_columns = existing_columns + new_columns
-
+ 
         row_df = pd.DataFrame([record]).reindex(columns=existing_columns)
         row_df.to_csv(self.log_path, mode="a", header=False, index=False)
         return record
+ 
+    def count_unused_outcomes(self) -> int:
+        import pandas as pd
+        if not self.log_path.exists() or self.log_path.stat().st_size < 10:
+            return 0
+        df = pd.read_csv(self.log_path, dtype=str)
+        # Local CSV mode is simple; we just return total count.
+        return len(df)
+ 
+    def mark_used_for_training(self) -> None:
+        # No-op for CSV mode.
+        pass
+
 
 class SupabaseOutcomesRepository:
     """Production implementation using Supabase Postgres."""
@@ -132,3 +154,10 @@ class SupabaseOutcomesRepository:
 
         response = self.client.table("outcomes").insert(db_row).execute()
         return response.data[0] if response.data else {}
+
+    def count_unused_outcomes(self) -> int:
+        response = self.client.table("outcomes").select("id", count="exact").eq("used_for_training", False).execute()
+        return response.count if response.count is not None else 0
+
+    def mark_used_for_training(self) -> None:
+        self.client.table("outcomes").update({"used_for_training": True}).eq("used_for_training", False).execute()
