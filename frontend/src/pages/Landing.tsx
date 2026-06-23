@@ -233,7 +233,7 @@ export const Landing: React.FC = () => {
             { name: 'Sneh Kansagara', role: 'AI/ML Engineer (Team Leader)', pos: 'center', scale: 1 },
             { name: 'Akshat Tripathi', role: 'ML & Backend Engineer', pos: 'center', scale: 1 },
             { name: 'Advait Mishra', role: 'Frontend & Backend Engineer', pos: 'center', scale: 1 },
-            { name: 'Priyanshu Jha', role: 'Cloud & MLOps Engineer', pos: '100% 0%', scale: 1.6, ext: 'png' },
+            { name: 'Priyanshu Jha', role: 'Cloud & MLOps Engineer', pos: 'center', scale: 1, ext: 'png' },
           ].map((member, i) => (
             <div key={i} className="team-card">
               <div className="team-photo">
