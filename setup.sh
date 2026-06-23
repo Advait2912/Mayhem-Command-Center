@@ -1,41 +1,40 @@
 #!/usr/bin/env bash
+
 set -e
 
-# Simple spinner that runs while a background command is alive
-spin() {
-    local pid=$!
-    local delay=0.1
-    local spinstr='|/-\\'
-    while kill -0 "$pid" 2>/dev/null; do
-        local tmp=${spinstr#?}
-        printf "\r[%c] " "$spinstr"
-        spinstr=$tmp${spinstr%"$tmp"}
-        sleep $delay
-    done
-    printf "\r    \r"
-}
+echo "=== Mayhem Command Center Fresh Setup ==="
+echo
 
-echo "=== Setting up GridLock Command Center (Linux/macOS) ==="
+echo "[1/5] Removing old Python environment..."
+if [ -d "venv" ]; then
+    chmod -R u+w venv 2>/dev/null || true
+    rm -rf venv || true
+fi
 
-# 1️⃣ Create Python virtual environment
-echo -n "1️⃣ Creating Python virtual environment... "
-python3 -m venv venv & spin
-echo "✅"
+echo "[2/5] Removing old Node.js dependencies..."
+if [ -d "frontend/node_modules" ]; then
+    chmod -R u+w frontend/node_modules 2>/dev/null || true
+    rm -rf frontend/node_modules || true
+fi
 
-# Activate the environment for subsequent commands
+rm -f frontend/package-lock.json
+
+echo "[3/5] Creating fresh Python environment..."
+python3 -m venv venv
+
+echo "[4/5] Activating environment..."
 source venv/bin/activate
 
-# 2️⃣ Install Python dependencies
-echo -n "2️⃣ Installing Python dependencies... "
-pip install -r requirements.txt > /dev/null 2>&1 & spin
-echo "✅"
+echo "[5/5] Installing Python dependencies..."
+python -m pip install -r requirements.txt
 
-# 3️⃣ Install Node.js dependencies
-echo -n "3️⃣ Installing Node.js dependencies... "
-( cd frontend && npm install > /dev/null 2>&1 ) & spin
-echo "✅"
+echo
+echo "[6/6] Installing Node.js dependencies..."
+cd frontend
+npm install
+cd ..
 
-echo "--------------------------------------------------------"
-echo "✅ Setup complete! You can now run the app with ./run.sh"
-echo "--------------------------------------------------------"
-
+echo
+echo "✓ Setup complete!"
+echo "Run with:"
+echo "    ./run.sh"

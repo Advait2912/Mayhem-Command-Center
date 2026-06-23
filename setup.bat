@@ -1,29 +1,49 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 
-echo === Setting up GridLock Command Center (Windows) ===
+echo === Setting up Mayhem Command Center (Windows) ===
+echo.
 
-:: 1️⃣ Create Python virtual environment
-echo 1️⃣ Creating Python virtual environment...
+:: Remove old venv if it exists
+if exist venv (
+    echo Removing existing virtual environment...
+    rmdir /s /q venv
+)
+
+:: Create virtual environment
+echo [1/3] Creating Python virtual environment...
 python -m venv venv
+if errorlevel 1 goto :error
+
 call venv\Scripts\activate.bat
 
-echo ✅
+:: Install Python dependencies
+echo [2/3] Installing Python dependencies...
+pip install -r requirements.txt
+if errorlevel 1 goto :error
 
-:: 2️⃣ Install Python dependencies
-echo 2️⃣ Installing Python dependencies...
-pip install -r requirements.txt >nul 2>&1
-echo ✅
-
-:: 3️⃣ Install Node.js dependencies
-echo 3️⃣ Installing Node.js dependencies...
+:: Install Node dependencies
+echo [3/3] Installing Node.js dependencies...
 pushd frontend
-call npm install >nul 2>&1
+call npm install
+if errorlevel 1 (
+    popd
+    goto :error
+)
 popd
-echo ✅
 
+echo.
 echo --------------------------------------------------------
-echo ✅ Setup complete! You can now run the app with run.bat
+echo Setup complete!
+echo Run the application using:
+echo     run.bat
 echo --------------------------------------------------------
 pause
+exit /b 0
 
+:error
+echo.
+echo Setup failed.
+echo Check the error messages above.
+pause
+exit /b 1
